@@ -49,7 +49,7 @@ test("Production acceptance A — confirmed imports persist and audit", async ({
   ).toBeVisible();
   await page.getByRole("link", { name: "Audit Reports" }).click();
   await expect(
-    page.getByText("Data import confirmed", { exact: false }).first(),
+    page.getByText("Operational import committed", { exact: false }).first(),
   ).toBeVisible();
   await page.getByRole("link", { name: "Data Imports" }).click();
   await confirmedImport(page, "conversations", "conversations.csv");
@@ -77,7 +77,6 @@ test("Production acceptance B — Maya analysis through recorded outcome and aud
   ).toBeVisible();
   await page.getByRole("link", { name: "Alert Centre" }).click();
   await expect(page.getByText("Maya Tan", { exact: true })).toBeVisible();
-  await expect(page.getByText("92%", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Review evidence" }).first().click();
   await expect(
     page.getByText("MSG-A-101", { exact: false }).first(),
@@ -100,34 +99,49 @@ test("Production acceptance B — Maya analysis through recorded outcome and aud
   await role(page, "Sales Manager");
   await page
     .getByLabel("Reviewer comment")
-    .fill("Evidence, uncertainty and service policy reviewed");
-  await page.getByRole("button", { name: "Approve", exact: true }).click();
-  await expect(page.locator(".notice.success")).toContainText(
-    "approved and ready for execution",
-  );
-  await role(page, "Account Executive");
+    .fill("Revise the promise to avoid an unsupported commitment");
   await page
-    .getByRole("button", { name: /Execute Approved WhatsApp Action/ })
-    .click();
-  await expect(page.locator(".notice.success")).toContainText(
-    "Record the customer response",
-  );
+    .getByLabel("Rejection reason")
+    .fill("Use only the approved service-policy wording");
+  await page.getByRole("button", { name: "Request Changes" }).click();
+  await role(page, "Account Executive");
+  await page.getByRole("button", { name: "Begin Revision" }).click();
+  await page
+    .getByLabel("Recommendation message draft")
+    .fill(
+      "Hi Maya, I am reviewing the replacement under the approved service policy.",
+    );
+  await page.getByRole("button", { name: "Submit for Approval" }).click();
+  await page.getByRole("button", { name: "View Retention Action" }).click();
+  await role(page, "Sales Manager");
+  await page
+    .getByLabel("Reviewer comment")
+    .fill("Revised evidence and policy wording verified");
+  await page.getByRole("button", { name: "Approve", exact: true }).click();
+  await role(page, "Account Executive");
+  await page.getByRole("button", { name: "Start Action" }).click();
+  await page.getByRole("button", { name: "Confirm Execution" }).click();
   await page
     .getByLabel("Customer response")
     .fill("Maya confirmed the replacement arrived");
+  await page.getByRole("button", { name: "Record Response" }).click();
+  await page.getByLabel("Action outcome").selectOption("Complaint resolved");
   await page
-    .getByLabel("Action outcome")
-    .fill("Service recovery completed; follow-up scheduled");
-  await page.getByRole("button", { name: "Record Outcome" }).click();
+    .getByLabel("Outcome notes")
+    .fill("Service recovery completed and verified by customer response");
+  await page
+    .getByRole("button", { name: /Record Outcome and Recalculate Risk/ })
+    .click();
   await expect(page.locator(".notice.success")).toContainText(
-    "risk queued for recalculation",
+    "were recalculated",
   );
   await page.getByRole("link", { name: "Audit Reports" }).click();
   for (const event of [
     "Recommendation submitted for approval",
     "Retention action approved",
-    "Retention action executed",
-    "Retention outcome recorded",
+    "Retention action started",
+    "Retention execution confirmed",
+    "Outcome recorded and risk recalculated",
   ])
     await expect(page.getByText(event, { exact: false }).first()).toBeVisible();
 });

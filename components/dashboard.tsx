@@ -37,7 +37,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { audits, customers, demoAccounts, trendChart } from "@/lib/demo-data";
+import { audits, demoAccounts, trendChart } from "@/lib/demo-data";
 import type { AVOAnalysis } from "@/lib/avo";
 import type { Customer, Role } from "@/lib/types";
 import type { ImportResult } from "@/lib/imports";
@@ -387,8 +387,39 @@ function DashboardInner({ initialPage }: { initialPage: string }) {
                 <Menu size={16} />
               </button>
               <span className="demo-label">
-                <Database size={12} /> Synthetic Demo Data
+                <Database size={12} />{" "}
+                {state.activeWorkspace === "demo"
+                  ? "Synthetic Demo Workspace"
+                  : "Imported Workspace"}
               </span>
+              <select
+                aria-label="Active workspace"
+                className="input"
+                value={state.activeWorkspace}
+                onChange={(e) =>
+                  demo.switchWorkspace(e.target.value as "demo" | "imported")
+                }
+              >
+                <option value="demo">Demo Workspace</option>
+                <option value="imported">Imported Workspace</option>
+              </select>
+              <button
+                className="btn btn-outline"
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      "Reset Demo Workspace? Imported Workspace data will be preserved.",
+                    )
+                  ) {
+                    demo.reset();
+                    notify(
+                      "Demo Workspace restored; Imported Workspace preserved.",
+                    );
+                  }
+                }}
+              >
+                Reset Demo Data
+              </button>
             </div>
             <div className="top-actions">
               <button className="btn btn-outline" onClick={() => go("avo")}>
@@ -514,6 +545,7 @@ function Page({
 }
 
 function Overview({ go }: { go: (p: string) => void }) {
+  const customers = useDemoWorkflow().dataset.customers;
   const atRisk = customers.filter(
     (c) => c.risk === "High" || c.risk === "Critical",
   );
@@ -729,6 +761,7 @@ function Alerts({
   go: (p: string) => void;
   notify: (s: string) => void;
 }) {
+  const customers = useDemoWorkflow().dataset.customers;
   const [risk, setRisk] = useState("All"),
     [owner, setOwner] = useState("All");
   const rows = customers.filter(
@@ -826,6 +859,8 @@ function Alerts({
 }
 
 function Customers({ notify }: { notify: (s: string) => void }) {
+  const { dataset, state } = useDemoWorkflow();
+  const customers = dataset.customers;
   const [selected, setSelected] = useState<Customer | null>(null);
   const [query, setQuery] = useState("");
   const filtered = customers.filter((c) =>
@@ -876,7 +911,7 @@ function Customers({ notify }: { notify: (s: string) => void }) {
               style={{ paddingLeft: 32 }}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search 30 synthetic customers"
+              placeholder={`Search ${customers.length} ${state.activeWorkspace} workspace customers`}
             />
           </div>
         </div>
@@ -890,7 +925,7 @@ function Customers({ notify }: { notify: (s: string) => void }) {
 }
 
 function Customer360({
-  customer: c,
+  customer: initialCustomer,
   back,
   notify,
 }: {
@@ -901,6 +936,10 @@ function Customer360({
   const [tab, setTab] = useState("Overview"),
     [analysis, setAnalysis] = useState<AVOAnalysis | null>(null),
     [loading, setLoading] = useState(false);
+  const demo = useDemoWorkflow();
+  const c =
+    demo.dataset.customers.find((item) => item.id === initialCustomer.id) ??
+    initialCustomer;
   const workflow = useWorkflow();
   const run = async () => {
     setLoading(true);
@@ -908,11 +947,14 @@ function Customer360({
       const r = await fetch("/api/avo/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ customerId: c.id }),
+          body: JSON.stringify({ customerId: c.id, customer: c }),
         }),
         data = await r.json();
       if (!r.ok) throw new Error(data.error);
       setAnalysis(data.analysis);
+      const rejected = demo.storeAnalysis(c.id, data.analysis);
+      if (rejected.length)
+        throw new Error(`Invalid evidence IDs: ${rejected.join(", ")}`);
       setTab("AVO Insights");
       workflow.log(
         "Conversation analysis",
@@ -1118,6 +1160,18 @@ function Customer360({
           <div className="top-actions">
             {badge(c.tier)}
             {badge(c.risk)}
+            <span className="demo-label">
+              {c.alerts ? "Active Alert" : "Monitored"}
+            </span>
+            <button
+              className="btn btn-outline"
+              onClick={() => {
+                demo.recalculate(c.id);
+                notify("Authoritative tier, churn, and alerts recalculated.");
+              }}
+            >
+              Manual Recalculate
+            </button>
             <button
               className="btn btn-primary"
               onClick={run}
@@ -1145,6 +1199,18 @@ function Customer360({
           <div className="kpi">
             <strong>{money(c.revenueAtRisk)}</strong>
             <span>revenue at risk</span>
+          </div>
+          <div className="kpi">
+            <strong>
+              {demo.dataset.churnCalculations[c.id]?.calculatedAt.slice(
+                0,
+                10,
+              ) ?? "Not evaluated"}
+            </strong>
+            <span>
+              last evaluated · next: import, AVO, response, outcome, or manual
+              trigger
+            </span>
           </div>
           <div className="kpi">
             <strong>{c.frequencyTrend}%</strong>
@@ -1202,6 +1268,8 @@ function RiskFactors({ c }: { c: Customer }) {
 }
 
 function Conversations({ notify }: { notify: (s: string) => void }) {
+  const demo = useDemoWorkflow();
+  const customers = demo.dataset.customers;
   const eligible = customers.filter((c) => c.messages.length);
   const [selected, setSelected] = useState(eligible[0]),
     [query, setQuery] = useState(""),
@@ -1228,11 +1296,14 @@ function Conversations({ notify }: { notify: (s: string) => void }) {
       const r = await fetch("/api/avo/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerId: selected.id }),
+        body: JSON.stringify({ customerId: selected.id, customer: selected }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error);
       setAnalysis(data.analysis);
+      const rejected = demo.storeAnalysis(selected.id, data.analysis);
+      if (rejected.length)
+        throw new Error(`Invalid evidence IDs: ${rejected.join(", ")}`);
       workflow.log(
         "Conversation analysis",
         selected.id,
@@ -1467,9 +1538,71 @@ function Imports({ notify }: { notify: (s: string) => void }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successId, setSuccessId] = useState("");
+  const [quickSummary, setQuickSummary] = useState("");
   const allowed = canImport(role, kind);
   const option = importOptions[kind];
 
+  async function quickImport(files: FileList | null) {
+    if (!files?.length) return;
+    setLoading(true);
+    setError("");
+    try {
+      const validated: ImportResult[] = [];
+      for (const selected of Array.from(files)) {
+        const form = new FormData();
+        form.set("file", selected);
+        const response = await fetch("/api/imports/validate", {
+          method: "POST",
+          body: form,
+        });
+        const result = (await response.json()) as ImportResult & {
+          error?: string;
+        };
+        if (!response.ok || result.error || !result.valid)
+          throw new Error(
+            `${selected.name}: ${result.error ?? result.errors?.[0]?.message ?? "validation failed"}`,
+          );
+        validated.push(result);
+      }
+      const order = ["customers", "products", "transactions", "conversations"];
+      validated.sort(
+        (a, b) =>
+          (order.indexOf(a.kind) < 0 ? 99 : order.indexOf(a.kind)) -
+          (order.indexOf(b.kind) < 0 ? 99 : order.indexOf(b.kind)),
+      );
+      const detected = validated
+        .map((item) => `${item.filename}: ${item.kind}`)
+        .join("\n");
+      if (
+        !window.confirm(
+          `Confirm detected import types and dependency order:\n${detected}`,
+        )
+      )
+        return;
+      let added = 0,
+        updated = 0,
+        rejected = 0,
+        affected = 0;
+      validated.forEach((item) => {
+        const summary = demo.addImport(item, item.kind);
+        added += summary.added;
+        updated += summary.updated;
+        rejected += summary.rejected;
+        affected += summary.affectedCustomerIds.length;
+      });
+      setQuickSummary(
+        `${validated.length} files · ${added} added · ${updated} updated · ${rejected} rejected · ${affected} affected customer references`,
+      );
+      notify("Multi-file Quick Import completed in dependency order.");
+    } catch (caught) {
+      const message =
+        caught instanceof Error ? caught.message : "Quick import failed";
+      setError(message);
+      notify(message);
+    } finally {
+      setLoading(false);
+    }
+  }
   async function validate(selected: File) {
     setLoading(true);
     setError("");
@@ -1540,8 +1673,10 @@ function Imports({ notify }: { notify: (s: string) => void }) {
   const confirm = () => {
     if (!result?.valid)
       return setError("Resolve validation errors before confirmation.");
-    const id = demo.addImport(result, kind);
-    setSuccessId(id);
+    const summary = demo.addImport(result, kind);
+    setSuccessId(
+      `${summary.added} added · ${summary.updated} updated · ${summary.affectedCustomerIds.length} affected customers`,
+    );
     notify("Import completed successfully.");
   };
   const clearFile = () => {
@@ -1621,8 +1756,89 @@ function Imports({ notify }: { notify: (s: string) => void }) {
               ? "Choose a file to continue."
               : "")
         }
-        expected="Validated records enter the shared demo store and create an audit event."
+        expected="Validated records enter the active operational workspace, recalculate affected customers, evaluate alerts, and create audit events."
       />
+      <section className="card" style={{ marginBottom: 16 }}>
+        <div className="card-head">
+          <div>
+            <h2>Operational data readiness</h2>
+            <p className="subtle">
+              Workspace: <b>{demo.state.activeWorkspace}</b>. Customer and
+              transaction data support behavioural scoring; conversations and
+              documents are optional enrichments.
+            </p>
+          </div>
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              demo.switchWorkspace("demo");
+              notify(
+                "Complete synthetic Demo Workspace loaded. No uploads required.",
+              );
+            }}
+          >
+            Load Demo Data
+          </button>
+        </div>
+        <div className="grid four">
+          <Metric
+            label="Customers"
+            value={demo.dataset.customers.length ? "Ready" : "Missing"}
+          />
+          <Metric
+            label="Transactions"
+            value={demo.dataset.transactions.length ? "Ready" : "Missing"}
+          />
+          <Metric
+            label="Conversations"
+            value={
+              demo.dataset.customers.some((c) => c.messages.length)
+                ? "Ready"
+                : "Partial"
+            }
+          />
+          <Metric
+            label="Policies / products"
+            value={
+              demo.dataset.documents.length || demo.dataset.products.length
+                ? "Ready"
+                : "Partial"
+            }
+          />
+        </div>
+        <p className="validation-help">
+          Missing conversations lower confidence and show conversation evidence
+          unavailable. Missing policies limits AVO to general, non-binding
+          suggestions. Basic churn calculation remains available.
+        </p>
+      </section>
+      <section className="card">
+        <div className="card-head">
+          <div>
+            <h2>Multi-file Quick Import</h2>
+            <p className="subtle">
+              Select multiple authorised files. Types are detected, confirmed,
+              and committed in customer → product → transaction → conversation →
+              document order.
+            </p>
+          </div>
+          <label className="btn btn-outline">
+            {loading ? "Processing…" : "Select multiple files"}
+            <input
+              type="file"
+              multiple
+              hidden
+              disabled={loading}
+              onChange={(e) => quickImport(e.target.files)}
+            />
+          </label>
+        </div>
+        {quickSummary && (
+          <div className="notice success" role="status">
+            {quickSummary}
+          </div>
+        )}
+      </section>
       <div className="grid two">
         <div className="card">
           <div className="card-head">

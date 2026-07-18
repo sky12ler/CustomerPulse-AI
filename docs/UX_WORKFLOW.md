@@ -45,3 +45,9 @@ The reusable guide marks completed/current/pending stages, missing requirements,
 ## Success and error conventions
 
 Material operations render an in-page success or error state plus next routes; toast feedback supplements but does not replace it. Disabled controls include inline explanations or a title. Unauthorized routes state why access is restricted, name an eligible role, and link to Overview.
+
+## Phase 1 workflow guide
+
+The application displays the active Demo or Imported Workspace in the header. Customer 360 shows Monitored or Active Alert, the latest authoritative score, last evaluated date, future trigger description, source provenance, and Manual Recalculate.
+
+Retention Actions exposes the next responsible control for each state: Begin Revision, Start Action, Open Approved WhatsApp, Confirm Execution, Record Response, Record No Response, Extend Deadline, Send Approved Follow-up, Escalate, and Record Outcome and Recalculate Risk. Disabled controls explain missing role or required information.

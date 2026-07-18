@@ -34,3 +34,21 @@ Deterministic tiering, hybrid churn scoring, AVO Analysis and Chat, evidence/con
 ## External-service caveats
 
 No OpenAI, Buffer, or Supabase credentials were available. Therefore live GPT-5.6 responses, Buffer delivery, and remote Supabase deployment are not claimed. Demo AVO and Demo Publisher are verified and explicitly labelled. The pushed Vercel `workflow-v2` release was observed and all 30 Playwright tests passed against the public production URL.
+
+## Phase 1 acceptance verification
+
+Passed locally on 2026-07-19:
+
+- Confirmed imports update operational data and recalculate only affected customers.
+- Transaction changes update tier, churn, revenue at risk, and alerts.
+- AVO evidence validation creates official signals without allowing AVO to set the score.
+- Alerts create, update, resolve, and reopen idempotently.
+- Demo and Imported Workspaces are isolated and persisted; Demo reset preserves imported records.
+- Changes Requested supports versioned revision and resubmission.
+- Approval, start, execution confirmation, responses, outcomes, and recalculation are separate.
+- Waiting for Customer and Outcome Required are reachable.
+- Analytics reads current customers, actions, signals, responses, and outcomes.
+- RBAC, manager approval, self-approval protection, consent checks, and audit events remain enforced.
+- Credential-free demo requires no upload.
+
+Not part of the verified Phase 1 acceptance: background scheduling, ZIP bundle import, or credentialed external providers.

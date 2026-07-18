@@ -31,6 +31,7 @@ export interface ImportResult {
   duplicateCount: number;
   headers: string[];
   preview: Record<string, unknown>[];
+  records?: Record<string, unknown>[];
   errors: ImportError[];
   extractedText?: string;
   pages?: number;
@@ -456,6 +457,7 @@ export async function validateImportFile(
         duplicateCount: duplicates,
         headers: parsed.headers,
         preview: mappedRows.slice(0, 5),
+        records: mappedRows,
         errors,
       };
     } catch (e) {

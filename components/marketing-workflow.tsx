@@ -410,6 +410,10 @@ export function CampaignStudioV2({
         if (!response.ok || data.error)
           throw new Error(data.error || `Publishing ${channel} failed`);
         posts.push({
+          datasetId: demo.state.activeWorkspace,
+          sourceType: data.simulated
+            ? "Demo Publisher"
+            : "External Integration",
           id: `POST-${campaign.id}-${channel.toUpperCase()}`,
           campaignId: campaign.id,
           campaignName: campaign.name,
@@ -1131,6 +1135,8 @@ export function CalendarV2({
 }
 
 export function AnalyticsV2({ go }: { go: (path: string) => void }) {
+  const demo = useDemoWorkflow();
+  const customers = demo.dataset.customers;
   const [filters, setFilters] = useState({
     date: "Last 30 days",
     comparison: "Previous 30 days",
@@ -1168,7 +1174,7 @@ export function AnalyticsV2({ go }: { go: (path: string) => void }) {
     [
       "Most important positive change",
       "Observed data",
-      "+6 completed recovery actions",
+      `${demo.state.actions.filter((item) => item.status === "Completed").length} completed recovery actions`,
       "vs previous period",
       "Strategic customers",
       "Review completed outcomes",
@@ -1205,7 +1211,7 @@ export function AnalyticsV2({ go }: { go: (path: string) => void }) {
       "Most effective retention action",
       "Observed data",
       "Service recovery",
-      "3 positive recorded outcomes",
+      `${demo.dataset.outcomes.filter((item) => ["Customer retained", "Complaint resolved", "Purchase completed"].includes(item.type)).length} positive recorded outcomes`,
       "Strategic",
       "Reuse approved playbook",
       "Medium",
@@ -1222,7 +1228,7 @@ export function AnalyticsV2({ go }: { go: (path: string) => void }) {
     [
       "Approval bottleneck",
       "Calculated estimate",
-      "2 pending reviews",
+      `${demo.state.actions.filter((item) => item.status === "Pending Approval").length} pending reviews`,
       "median wait 1.5 days",
       "Sales queue",
       "Allocate reviewer coverage",
@@ -1231,7 +1237,7 @@ export function AnalyticsV2({ go }: { go: (path: string) => void }) {
     [
       "AVO governance concern",
       "AVO interpretation",
-      "4 medium-confidence outputs",
+      `${demo.dataset.signals.filter((item) => item.validationStatus === "Staff Review Required").length} staff-review signals`,
       "staff review required",
       "All segments",
       "Inspect evidence before decisions",

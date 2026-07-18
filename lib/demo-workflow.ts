@@ -1,15 +1,24 @@
 import type { AuditEvent, Risk, Role, Tier } from "./types";
 import type { ImportResult } from "./imports";
+import { customers as seedCustomers } from "./demo-data";
+import {
+  createDataset,
+  type ImportCommitSummary,
+  type OperationalDataset,
+  type WorkspaceKind,
+} from "./operational";
 
 export type ActionStatus =
   | "Draft"
   | "Pending Approval"
   | "Changes Requested"
-  | "Approved"
+  | "Rejected"
+  | "Approved and Ready"
   | "In Progress"
   | "Waiting for Customer"
+  | "Outcome Required"
   | "Completed"
-  | "Rejected";
+  | "Cancelled";
 
 export type CampaignStatus =
   | "Draft"
@@ -32,6 +41,8 @@ export interface ApprovalHistoryItem {
 
 export interface RetentionActionRecord {
   id: string;
+  datasetId: WorkspaceKind;
+  sourceType: string;
   recommendationId: string;
   alertId: string;
   customerId: string;
@@ -60,8 +71,19 @@ export interface RetentionActionRecord {
   customerResponse: string;
   submittedAt?: string;
   approvedAt?: string;
+  startedAt?: string;
+  startedBy?: string;
   executedAt?: string;
+  executedBy?: string;
+  responseExpected?: boolean;
+  responseDeadline?: string;
   completedAt?: string;
+  versions: Array<{
+    version: number;
+    content: string;
+    actor: string;
+    at: string;
+  }>;
   history: ApprovalHistoryItem[];
 }
 
@@ -83,6 +105,8 @@ export interface ImportHistoryRecord {
 
 export interface CampaignDraft {
   id: string;
+  datasetId: WorkspaceKind;
+  sourceType: string;
   triggerId: string;
   status: CampaignStatus;
   step: number;
@@ -118,6 +142,8 @@ export interface CampaignDraft {
 
 export interface ScheduledPostRecord {
   id: string;
+  datasetId: WorkspaceKind;
+  sourceType: string;
   campaignId: string;
   campaignName: string;
   channel: string;
@@ -140,6 +166,9 @@ export interface WalkthroughState {
 
 export interface DemoWorkflowState {
   version: number;
+  activeWorkspace: WorkspaceKind;
+  datasets: Record<WorkspaceKind, OperationalDataset>;
+  lastImportSummary?: ImportCommitSummary;
   role: Role;
   recommendationStatuses: Record<string, string>;
   actions: RetentionActionRecord[];
@@ -181,6 +210,8 @@ const action = (
   deadline: string,
 ): RetentionActionRecord => ({
   id,
+  datasetId: "demo",
+  sourceType: "Demo Seed",
   recommendationId:
     id === "ACT-021"
       ? "REC-001"
@@ -223,7 +254,7 @@ const action = (
       ? "Completed"
       : ["In Progress", "Waiting for Customer"].includes(status)
         ? status
-        : status === "Approved"
+        : status === "Approved and Ready"
           ? "Ready"
           : "Not started",
   confidence: "High",
@@ -253,6 +284,7 @@ const action = (
     status === "Completed"
       ? "Positive response and subsequent purchase recorded."
       : "",
+  versions: [{ version: 1, content: recommendation, actor: owner, at: now }],
   history:
     status === "Draft"
       ? [
@@ -300,7 +332,12 @@ export function createInitialDemoState(
   seedEvents: AuditEvent[],
 ): DemoWorkflowState {
   return {
-    version: 2,
+    version: 3,
+    activeWorkspace: "demo",
+    datasets: {
+      demo: createDataset("demo", seedCustomers),
+      imported: createDataset("imported"),
+    },
     role: "Administrator",
     recommendationStatuses: {
       "REC-001": "Draft",
@@ -338,7 +375,7 @@ export function createInitialDemoState(
         "Priya Nair",
         "Core",
         "High",
-        "Approved",
+        "Approved and Ready",
         "Aisha Rahman",
         "Arrange value review meeting",
         "High",
@@ -349,8 +386,8 @@ export function createInitialDemoState(
         "CUS-1004",
         "Omar Aziz",
         "Core",
-        "Medium",
-        "Completed",
+        "High",
+        "Approved and Ready",
         "Daniel Wong",
         "Complete recovery check-in",
         "Low",
@@ -419,6 +456,8 @@ export function createInitialDemoState(
     ],
     imports: [],
     campaign: {
+      datasetId: "demo",
+      sourceType: "Demo Seed",
       id: "CAM-003",
       triggerId: "MKT-003",
       status: "Draft",
@@ -464,6 +503,8 @@ export function createInitialDemoState(
     },
     scheduledPosts: [
       {
+        datasetId: "demo",
+        sourceType: "Demo Seed",
         id: "POST-001",
         campaignId: "CAM-001",
         campaignName: "Product planning guide",
@@ -479,6 +520,8 @@ export function createInitialDemoState(
         owner: "Nadia Wong",
       },
       {
+        datasetId: "demo",
+        sourceType: "Demo Seed",
         id: "POST-002",
         campaignId: "CAM-002",
         campaignName: "Recovery stories",

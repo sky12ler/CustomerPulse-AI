@@ -19,6 +19,13 @@ export interface Message {
 }
 export interface Customer {
   id: string;
+  datasetId?: "demo" | "imported";
+  sourceType?: string;
+  sourceFileName?: string;
+  importBatchId?: string;
+  importedBy?: string;
+  importedAt?: string;
+  originalExternalId?: string;
   name: string;
   company: string;
   industry: string;

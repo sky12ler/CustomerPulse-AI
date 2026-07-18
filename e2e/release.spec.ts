@@ -279,7 +279,8 @@ test("21 audit captures requester approver executor chain", async ({
   await page.getByLabel("Reviewer comment").fill("Verified");
   await page.getByRole("button", { name: "Approve", exact: true }).click();
   await signInAs(page, "Account Executive");
-  await page.getByRole("button", { name: /Execute Approved/ }).click();
+  await page.getByRole("button", { name: "Start Action" }).click();
+  await page.getByRole("button", { name: "Confirm Execution" }).click();
   await page.getByRole("link", { name: "Audit Reports" }).click();
   await expect(
     page
@@ -290,7 +291,7 @@ test("21 audit captures requester approver executor chain", async ({
     page.getByText("Retention action approved", { exact: false }).first(),
   ).toBeVisible();
   await expect(
-    page.getByText("Retention action executed", { exact: false }).first(),
+    page.getByText("Retention execution confirmed", { exact: false }).first(),
   ).toBeVisible();
 });
 

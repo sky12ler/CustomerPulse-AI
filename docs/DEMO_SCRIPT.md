@@ -39,3 +39,13 @@ Close: “The same system works without credentials using deterministic AVO and 
 ## Presenter fallback
 
 If live OpenAI is unavailable, continue with AVO Demo Analysis; that is the verified path. If Buffer is unavailable, use Demo Publisher; it creates real in-app ScheduledPost records but does not post externally. If an upload fails, read the in-page status and do not claim success—use the bundled file again after confirming the role and type.
+
+## Phase 1 calculated demo (under three minutes)
+
+1. In the header choose Demo Workspace and Reset Demo Data. Explain that Imported Workspace is preserved.
+2. Open Maya Tan in Conversations and Run AVO Analysis. Point out validated message evidence, confidence, uncertainty, the new official churn calculation, and alert.
+3. Open the recommendation, edit it, and submit. As Sales Manager request changes with explicit feedback. Return as Account Executive, Begin Revision, edit, and resubmit.
+4. As Sales Manager approve. Return as Account Executive, Start Action, open the approved WhatsApp control, and Confirm Execution.
+5. Record Mayas response. Show that it is a separate record and the state becomes Outcome Required. Select Complaint resolved, add notes, and record the outcome.
+6. Open Customer 360/Analytics/Audit. Show calculated before/after score, revenue-at-risk change, updated alert, and the complete event chain.
+7. Optionally open Omars Approved and Ready action and repeat the recovery path; the score decrease comes from the same engine, not a scenario constant.

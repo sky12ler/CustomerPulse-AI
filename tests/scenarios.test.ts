@@ -43,10 +43,10 @@ describe("required demo scenarios", () => {
     ).toBeGreaterThanOrEqual(4);
     expect(detectSegmentDecline(4, 12, 18, 24, 29).triggered).toBe(true);
   });
-  it("D: recovered customer shows positive response, new purchase and lower risk", () => {
+  it("D: recovery scenario begins with an actionable high-risk customer", () => {
     const c = customers.find((x) => x.scenario === "D")!;
-    expect(c.status).toBe("Recovered");
-    expect(c.risk).toBe("Medium");
+    expect(c.status).toBe("Needs recovery");
+    expect(c.risk).toBe("High");
     expect(c.messages.some((m) => /placed our next order/i.test(m.text))).toBe(
       true,
     );

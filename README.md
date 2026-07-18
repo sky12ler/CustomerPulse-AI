@@ -143,3 +143,15 @@ The application’s live AVO adapter targets the OpenAI Responses API with `OPEN
 The credential-free demo persists workflow mutations and the selected role in browser localStorage; Reset Demo restores the seeded state. Live Supabase Auth/persistence/Storage, two-tenant runtime testing, live GPT-5.6 evaluation, credential-tested Buffer publishing/status/retries, persistent tracking analytics, Realtime, automatic campaign-image processing, AI image generation, live WhatsApp/email ingestion, CRM integration, and autonomous outreach are not implemented or verified. Future development should preserve the existing evidence, consent, authorization, approval, and audit boundaries.
 
 For submission-ready copy, use [Devpost Submission](docs/DEVPOST_SUBMISSION.md). For the walkthrough, use the [under-three-minute Demo Script](docs/DEMO_SCRIPT.md).
+
+## Phase 1 dynamic operational pipeline
+
+CustomerPulse AI now runs its credential-free demonstration from one persisted operational store. The pipeline is: customer and transaction data plus authorised conversations -> deterministic tier components plus validated AVO signals -> authoritative churn calculation -> idempotent alerts -> governed recommendation and approval -> separate start, execution, response, outcome, and risk recalculation.
+
+The header exposes two isolated datasets. **Demo Workspace** loads the permanent synthetic scenario without uploads. **Imported Workspace** receives confirmed incremental uploads and is never silently mixed with demo records. Reset Demo Data restores only the Demo Workspace and preserves imported records.
+
+Authoritative functions are `calculateCustomerTier()`, `calculateChurn()`, `evaluateCustomerAlerts()`, and `recalculateCustomers()` in `lib/operational.ts`. AVO stores structured analyses and validated evidence-linked signals; it never writes the official score directly. Low-confidence signals are marked Staff Review Required and excluded from scoring.
+
+The complete action lifecycle is Draft -> Pending Approval -> Approved and Ready -> In Progress -> Waiting for Customer or Outcome Required -> Completed. Changes Requested returns through a versioned Draft Revision. Responses and outcomes are separate records; a valid outcome runs the real churn engine and records the before/after score in audit.
+
+Limitations: browser demo state is localStorage-backed and device-local; scheduled background monitoring is future scope; external WhatsApp/email controls are deep links or staff-confirmed demo actions; live OpenAI, Buffer, Supabase, and external messaging were not credential-tested in Phase 1. Multi-file Quick Import is implemented, but ZIP bundle import is not.

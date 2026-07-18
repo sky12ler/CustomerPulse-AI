@@ -6,20 +6,18 @@ import { customers, recommendations } from "@/lib/demo-data";
 import { canOutreach } from "@/lib/engines";
 import type { RetentionActionRecord } from "@/lib/demo-workflow";
 import type { Role } from "@/lib/types";
+import type { OutcomeType } from "@/lib/operational";
 import { useDemoWorkflow } from "./workflow-context";
 import { WorkflowGuide } from "./workflow-guide";
 
 const retentionSteps = [
-  "Data available",
-  "Conversation analysed",
-  "Risk calculated",
-  "Alert generated",
-  "Recommendation generated",
-  "Submitted for approval",
-  "Manager reviewed",
-  "Action approved",
-  "Action executed",
-  "Outcome recorded",
+  "Recommendation",
+  "Pending Approval",
+  "Approved and Ready",
+  "In Progress",
+  "Waiting for Customer",
+  "Outcome Required",
+  "Completed",
 ];
 const badge = (value: string) => (
   <span className={`badge ${value.toLowerCase().replaceAll(" ", "-")}`}>
@@ -43,6 +41,16 @@ export function RecommendationsV2({
   );
   const current =
     demo.state.recommendationStatuses[selected] === "Submitted" ? 5 : 4;
+  if (demo.state.activeWorkspace === "imported")
+    return (
+      <section className="card empty">
+        <h2>No imported recommendations yet</h2>
+        <p>
+          Import customers and transactions, then run AVO on authorised
+          conversations. Demo recommendations remain isolated in Demo Workspace.
+        </p>
+      </section>
+    );
   return (
     <div>
       <WorkflowGuide
@@ -58,7 +66,9 @@ export function RecommendationsV2({
             <span className="badge medium">Human review required</span>
           </div>
           {recommendations.map((item) => {
-            const customer = customers.find((c) => c.id === item.customerId)!;
+            const customer =
+              demo.dataset.customers.find((c) => c.id === item.customerId) ??
+              customers.find((c) => c.id === item.customerId)!;
             const status =
               demo.state.recommendationStatuses[item.id] ?? item.status;
             return (
@@ -99,7 +109,9 @@ function RecommendationDetail({
   go: (s: string) => void;
 }) {
   const demo = useDemoWorkflow();
-  const customer = customers.find((item) => item.id === rec.customerId)!;
+  const customer =
+    demo.dataset.customers.find((item) => item.id === rec.customerId) ??
+    customers.find((item) => item.id === rec.customerId)!;
   const [draft, setDraft] = useState(
     customer.scenario === "A"
       ? "Hi Maya, I’m sorry our promised update was missed. I’m reviewing the replacement status under our service policy and will confirm the next step after manager approval."
@@ -303,7 +315,8 @@ export function ActionsV2({
       .length,
     changes: demo.state.actions.filter((a) => a.status === "Changes Requested")
       .length,
-    ready: demo.state.actions.filter((a) => a.status === "Approved").length,
+    ready: demo.state.actions.filter((a) => a.status === "Approved and Ready")
+      .length,
     progress: demo.state.actions.filter((a) => a.status === "In Progress")
       .length,
     overdue: demo.state.actions.filter(
@@ -316,6 +329,7 @@ export function ActionsV2({
   };
   const visible = demo.state.actions.filter(
     (item) =>
+      item.datasetId === demo.state.activeWorkspace &&
       (tab === "All" ||
         (tab === "My Tasks" && item.owner === actor(role)) ||
         item.status === tab) &&
@@ -324,7 +338,10 @@ export function ActionsV2({
         .includes(search.toLowerCase()),
   );
   const action =
-    demo.state.actions.find((item) => item.id === selected) ?? visible[0];
+    demo.state.actions.find(
+      (item) =>
+        item.id === selected && item.datasetId === demo.state.activeWorkspace,
+    ) ?? visible[0];
   const decide = (decision: "Approved" | "Rejected" | "Changes Requested") => {
     setError("");
     try {
@@ -339,43 +356,70 @@ export function ActionsV2({
       setError(caught instanceof Error ? caught.message : "Decision failed");
     }
   };
+  const start = () => {
+    setError("");
+    try {
+      demo.startAction(action.id);
+      setSuccess(
+        "Action started. Use the approved execution control, then confirm execution.",
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Start failed");
+    }
+  };
   const execute = () => {
     setError("");
     try {
-      const customer = customers.find((c) => c.id === action.customerId);
+      const customer = demo.dataset.customers.find(
+        (c) => c.id === action.customerId,
+      );
       if (!customer || !canOutreach(customer, "WhatsApp"))
         throw new Error(
           "WhatsApp action is unavailable because customer consent has been withdrawn.",
         );
-      demo.executeAction(action.id);
-      setSuccess("Action executed. Record the customer response and outcome.");
-      notify("Action executed. Record the customer response and outcome.");
+      demo.executeAction(
+        action.id,
+        true,
+        "Approved WhatsApp deep link opened and execution confirmed",
+      );
+      setSuccess("Execution confirmed. Waiting for Customer is now active.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Execution failed");
+    }
+  };
+  const captureResponse = () => {
+    setError("");
+    try {
+      demo.recordResponse(action.id, response, "Positive");
+      setSuccess(
+        "Customer response stored separately. Record the business outcome next.",
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Response failed");
     }
   };
   const record = () => {
     setError("");
     try {
-      demo.recordOutcome(action.id, response, outcome);
+      demo.recordOutcome(action.id, outcome as OutcomeType, response);
       setSuccess(
-        "Outcome recorded and customer risk queued for recalculation.",
+        "Outcome recorded. Risk, alert, revenue at risk, and analytics were recalculated.",
       );
-      notify("Outcome recorded and customer risk queued for recalculation.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Outcome failed");
     }
   };
-  const current =
-    action?.status === "Completed"
-      ? 9
-      : action?.status === "In Progress"
-        ? 8
-        : action?.status === "Approved"
-          ? 7
-          : action?.status === "Pending Approval"
-            ? 6
-            : 5;
+  const lifecycleIndex: Record<string, number> = {
+    Draft: 0,
+    "Changes Requested": 0,
+    "Pending Approval": 1,
+    "Approved and Ready": 2,
+    "In Progress": 3,
+    "Waiting for Customer": 4,
+    "Outcome Required": 5,
+    Completed: 6,
+  };
+  const current = lifecycleIndex[action?.status ?? "Draft"] ?? 0;
   return (
     <div>
       <WorkflowGuide
@@ -408,9 +452,10 @@ export function ActionsV2({
             "Draft",
             "Pending Approval",
             "Changes Requested",
-            "Approved",
+            "Approved and Ready",
             "In Progress",
             "Waiting for Customer",
+            "Outcome Required",
             "Completed",
             "Rejected",
           ].map((value) => (
@@ -516,7 +561,9 @@ export function ActionsV2({
           setResponse={setResponse}
           setOutcome={setOutcome}
           decide={decide}
+          start={start}
           execute={execute}
+          captureResponse={captureResponse}
           record={record}
           notify={notify}
           go={go}
@@ -541,7 +588,9 @@ interface ActionDetailProps {
   setResponse: (value: string) => void;
   setOutcome: (value: string) => void;
   decide: (decision: "Approved" | "Rejected" | "Changes Requested") => void;
+  start: () => void;
   execute: () => void;
+  captureResponse: () => void;
   record: () => void;
   notify: (message: string) => void;
   go: (path: string) => void;
@@ -563,7 +612,9 @@ function ActionDetail(props: ActionDetailProps) {
     setResponse,
     setOutcome,
     decide,
+    start,
     execute,
+    captureResponse,
     record,
     notify,
     go,
@@ -659,7 +710,7 @@ function ActionDetail(props: ActionDetailProps) {
                 />
               </label>
               <label className="field">
-                Rejection reason (required for rejection)
+                Requested changes or rejection reason
                 <input
                   aria-label="Rejection reason"
                   className="input"
@@ -692,7 +743,8 @@ function ActionDetail(props: ActionDetailProps) {
                 </button>
                 <button
                   className="btn btn-outline"
-                  disabled={!manager || !comment.trim()}
+                  disabled={!manager || !comment.trim() || !reason.trim()}
+                  title={!reason.trim() ? "Requested changes are required" : ""}
                   onClick={() => decide("Changes Requested")}
                 >
                   Request Changes
@@ -737,28 +789,78 @@ function ActionDetail(props: ActionDetailProps) {
               )}
             </>
           )}
-          {action.status === "Approved" && (
+          {action.status === "Changes Requested" && (
+            <div className="notice warning">
+              <b>Reviewer feedback:</b> {action.reviewerComment}
+              <button
+                className="btn btn-primary"
+                disabled={!executor}
+                onClick={() => {
+                  demo.beginRevision(action.id);
+                  go(
+                    "recommendations?recommendationId=" +
+                      action.recommendationId,
+                  );
+                }}
+              >
+                Begin Revision
+              </button>
+            </div>
+          )}
+          {action.status === "Approved and Ready" && (
             <>
+              <p>
+                <b>Next step:</b> The assigned owner starts the approved action.
+                Starting does not execute it.
+              </p>
               <button
                 className="btn btn-primary"
                 disabled={!executor}
                 title={
-                  !executor ? "Account Executive or Administrator required" : ""
+                  !executor
+                    ? "Assigned Account Executive or Administrator required"
+                    : ""
                 }
-                onClick={execute}
+                onClick={start}
               >
-                <MessageCircle size={14} /> Execute Approved WhatsApp Action
+                Start Action
               </button>
-              {!executor && (
-                <p className="validation-help">
-                  Execution is unavailable because the action owner or
-                  Administrator role is required.
-                </p>
-              )}
             </>
           )}
-          {["In Progress", "Waiting for Customer"].includes(action.status) && (
+          {action.status === "In Progress" && (
             <>
+              <p>
+                <b>Execution control:</b> Open the approved WhatsApp message,
+                then confirm that execution occurred.
+              </p>
+              <a
+                className="btn btn-outline"
+                href={
+                  "https://wa.me/?text=" +
+                  encodeURIComponent(action.humanEditedOutput)
+                }
+                target="_blank"
+                rel="noreferrer"
+              >
+                <MessageCircle size={14} /> Open Approved WhatsApp
+              </a>{" "}
+              <button
+                className="btn btn-primary"
+                disabled={!executor}
+                onClick={execute}
+              >
+                Confirm Execution
+              </button>
+            </>
+          )}
+          {action.status === "Waiting for Customer" && (
+            <>
+              <div className="evidence">
+                <b>Waiting for Customer</b>
+                <br />
+                Executed {action.executedAt} � Response deadline{" "}
+                {action.responseDeadline} � Follow-up owner {action.owner}
+              </div>
               <label className="field">
                 Customer response
                 <input
@@ -768,26 +870,110 @@ function ActionDetail(props: ActionDetailProps) {
                   onChange={(e) => setResponse(e.target.value)}
                 />
               </label>
+              <button
+                className="btn btn-primary"
+                disabled={!response.trim()}
+                onClick={captureResponse}
+              >
+                Record Response
+              </button>{" "}
+              <button
+                className="btn btn-outline"
+                onClick={() => {
+                  demo.recordResponse(
+                    action.id,
+                    "No response received by deadline",
+                    "Neutral",
+                  );
+                  notify("No response recorded; outcome is now required.");
+                }}
+              >
+                Record No Response
+              </button>{" "}
+              <button
+                className="btn btn-outline"
+                onClick={() => {
+                  const date = new Date(action.responseDeadline ?? Date.now());
+                  date.setDate(date.getDate() + 3);
+                  demo.update((current) => ({
+                    ...current,
+                    actions: current.actions.map((item) =>
+                      item.id === action.id
+                        ? {
+                            ...item,
+                            responseDeadline: date.toISOString().slice(0, 10),
+                          }
+                        : item,
+                    ),
+                  }));
+                  demo.log("Response deadline extended", action.id, "Success");
+                  notify("Response deadline extended and audited.");
+                }}
+              >
+                Extend Deadline
+              </button>{" "}
+              <button
+                className="btn btn-outline"
+                onClick={() => {
+                  demo.log("Approved follow-up sent", action.id, "Success");
+                  notify("Approved follow-up recorded in the audit trail.");
+                }}
+              >
+                Send Approved Follow-up
+              </button>{" "}
+              <button
+                className="btn btn-outline"
+                onClick={() => {
+                  demo.log("Waiting action escalated", action.id, "Escalated");
+                  notify("Waiting action escalated and audited.");
+                }}
+              >
+                Escalate
+              </button>
+            </>
+          )}
+          {action.status === "Outcome Required" && (
+            <>
               <label className="field">
-                Outcome
-                <textarea
+                Outcome type
+                <select
                   aria-label="Action outcome"
                   className="input"
                   value={outcome}
                   onChange={(e) => setOutcome(e.target.value)}
+                >
+                  <option value="">Select an outcome</option>
+                  {[
+                    "Customer retained",
+                    "Complaint resolved",
+                    "Offer accepted",
+                    "Meeting scheduled",
+                    "Purchase completed",
+                    "No response",
+                    "Customer declined",
+                    "Customer churned",
+                    "Follow-up required",
+                    "Inconclusive",
+                  ].map((value) => (
+                    <option key={value}>{value}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                Outcome notes
+                <textarea
+                  aria-label="Outcome notes"
+                  className="input"
+                  value={response}
+                  onChange={(e) => setResponse(e.target.value)}
                 />
               </label>
               <button
                 className="btn btn-primary"
-                disabled={!response.trim() || !outcome.trim()}
-                title={
-                  !response.trim() || !outcome.trim()
-                    ? "Customer response and outcome are required"
-                    : ""
-                }
+                disabled={!response.trim() || !outcome}
                 onClick={record}
               >
-                Record Outcome
+                Record Outcome and Recalculate Risk
               </button>
             </>
           )}
