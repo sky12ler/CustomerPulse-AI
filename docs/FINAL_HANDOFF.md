@@ -1,4 +1,4 @@
-﻿# Final verification and handoff
+# Final verification and handoff
 
 Verification date: 18 July 2026 (Asia/Kuala Lumpur).
 
@@ -33,7 +33,7 @@ Disconnected page-local recommendation/action/campaign/calendar arrays were repl
 - `npm audit --audit-level=high`: zero vulnerabilities.
 - Secret scan: no credential or private-key match; one explicit `test-only-not-a-real-key` fixture is non-secret.
 
-Production results are recorded only after the pushed Vercel release is exercised; see the final handoff message and `P0_ACCEPTANCE.md`.
+- Public Vercel `workflow-v2`: 26/26 Playwright tests passed directly against https://customer-pulse-ai-eight.vercel.app, including customers.csv, conversations.csv, product-catalogue.pdf, invalid validation, role refresh, action approval/execution/audit, campaign scheduling/calendar, analytics, walkthroughs and mobile. Health reported Demo AVO and Demo Publisher.
 
 ## Environment variables
 

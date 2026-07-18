@@ -1,4 +1,4 @@
-﻿# Testing
+# Testing
 
 ## Commands
 
@@ -32,3 +32,7 @@ The 26 Playwright tests map directly to the requested acceptance list: role pers
 ## Production verification
 
 Local production-mode success is not production deployment evidence. After each Vercel release, verify `/api/health` reports `workflow-v2` and repeat the three named uploads plus both end-to-end workflows. Record provider mode from health: `avoProvider: demo|openai`, `publisher: demo|buffer`.
+
+## Verified production run
+
+After GitHub push, Vercel health reported `release: workflow-v2`, `avoProvider: demo`, and `publisher: demo`. The same 26 Playwright tests passed directly against `https://customer-pulse-ai-eight.vercel.app` in 41.5 seconds, including the three required production uploads.
