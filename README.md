@@ -120,8 +120,8 @@ npm audit
 Final verification passed:
 
 - **47/47 unit tests** across imports, tier/churn boundaries, AVO safeguards, workflows, scenarios, publisher behavior, mock data, and required Supabase security structure.
-- **26/26 production-browser tests** cover all numbered workflow acceptance cases, Scenarios A–D, persistence, multipart CSV/PDF imports, approval/execution gates, shared calendar records, audit history, guided demos, and mobile navigation.
-- **26/26 tests also passed against the public Vercel `workflow-v2` deployment**, including the required customers.csv, conversations.csv, and product-catalogue.pdf uploads.
+- **30/30 production-browser tests** cover all numbered workflow acceptance cases, Scenarios A–D, persistence, multipart CSV/PDF imports, approval/execution gates, shared calendar records, audit history, guided demos, and mobile navigation.
+- **30/30 tests also passed against the public Vercel `workflow-v2` deployment**, including the required customers.csv, conversations.csv, and product-catalogue.pdf uploads.
 - Lint, strict type checking, production build, and dependency audit; the audit reported zero vulnerabilities at verification time.
 
 See [Testing](docs/TESTING.md) and [Final handoff](docs/FINAL_HANDOFF.md).
