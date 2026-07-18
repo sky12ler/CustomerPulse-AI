@@ -184,6 +184,7 @@ const accessByRole: Record<Role, string[]> = {
   ],
   "Account Executive": [
     "overview",
+    "alerts",
     "customers",
     "conversations",
     "imports",
@@ -1441,7 +1442,8 @@ function AnalysisPanel({
         </div>
       ))}
       <div className="notice" style={{ marginTop: 10 }}>
-        {a.uncertainty_reason}
+        <strong>Uncertainty</strong>
+        <div>{a.uncertainty_reason}</div>
       </div>
       <button
         className="btn btn-primary"

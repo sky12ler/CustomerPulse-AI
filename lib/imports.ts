@@ -482,6 +482,14 @@ export async function validateImportFile(
   }
   if (ext === "pdf") {
     try {
+      // pdf.js needs browser geometry primitives when its module is evaluated.
+      // This explicit native import makes Vercel trace the platform binary.
+      const canvas = await import("@napi-rs/canvas");
+      Object.assign(globalThis, {
+        DOMMatrix: globalThis.DOMMatrix ?? canvas.DOMMatrix,
+        ImageData: globalThis.ImageData ?? canvas.ImageData,
+        Path2D: globalThis.Path2D ?? canvas.Path2D,
+      });
       const { PDFParse } = await import("pdf-parse");
       const parser = new PDFParse({ data: new Uint8Array(b) });
       const result = await parser.getText();
