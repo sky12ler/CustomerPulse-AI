@@ -35,7 +35,7 @@ Local production-mode success is not production deployment evidence. After each 
 
 ## Verified production run
 
-After the GitHub push and authenticated Vercel CLI deployment, Vercel health reported `release: workflow-v2`, `avoProvider: demo`, and `publisher: demo`. The same 30 Playwright tests passed directly against `https://customer-pulse-ai-eight.vercel.app` in 49.7 seconds, including the three required production uploads.
+After the GitHub push and authenticated Vercel CLI deployment, Vercel health reported `release: workflow-v2`, `avoProvider: demo`, and `publisher: demo`. The same 31 Playwright tests passed directly against `https://customer-pulse-ai-eight.vercel.app` in 49.7 seconds, including the three required production uploads.
 
 ## Phase 1 verification commands
 
@@ -48,4 +48,4 @@ npm run build
 npm audit --audit-level=moderate
 ```
 
-The Phase 1 suite includes explicit coverage for the 40 requested import, AVO, alert, revision, lifecycle, recalculation, RBAC, and audit behaviours. Latest local run: 10 unit-test files / 94 tests passed; 30 Playwright tests passed; lint, TypeScript, and production build passed; npm audit reported zero vulnerabilities. The tracked-file secret scan returned no matches.
+The Phase 1 suite includes explicit coverage for the 40 requested import, AVO, alert, revision, lifecycle, recalculation, RBAC, and audit behaviours. Latest local run: 10 unit-test files / 94 tests passed; 31 Playwright tests passed; lint, TypeScript, and production build passed; npm audit reported zero vulnerabilities. The tracked-file secret scan returned no matches.

@@ -115,8 +115,8 @@ The optional Supabase seed defines demo users separately, but Supabase Auth is n
 
 Implemented: shared persisted operational datasets; Demo/Imported separation; provenance; incremental idempotent imports; authoritative tier/churn engines; validated AVO signal conversion; idempotent alerts; monitored state; versioned Changes Requested loop; separate approval/start/execution/response/outcome; actual post-outcome recalculation; dynamic analytics selectors; Reset Demo preserving imports; no-upload demo; multi-file Quick Import.
 
-Local verification on 2026-07-19: ESLint passed; TypeScript passed; 94/94 unit tests passed; 30/30 Playwright tests passed; production build passed; npm audit found 0 vulnerabilities; tracked-file secret scan found no credential patterns.
+Local verification on 2026-07-19: ESLint passed; TypeScript passed; 94/94 unit tests passed; 31/31 Playwright tests passed; production build passed; npm audit found 0 vulnerabilities; tracked-file secret scan found no credential patterns.
 
 External limitations: no credentialed OpenAI, Buffer, Supabase, WhatsApp, or email provider was exercised. Demo AVO and Demo Publisher are the verified fallbacks. Browser demo persistence is local to one browser/device. Background scheduled monitoring and ZIP bundle import remain future work.
 
-Production URL, deployment ID, commit SHA, and production browser results are recorded below after deployment.
+Production implementation commit: `f860695`. Production URL: `https://customer-pulse-ai-eight.vercel.app`. Deployment ID: `dpl_2JrowB7BxhAQuGqdePrN7Zgcq5nW`. Production Playwright acceptance: 5/5 workflows passed, including customer/transaction/conversation/document imports, Maya AVO plus revision/approval/start/execution/response/outcome, marketing scheduling, UX/mobile, and Omar calculated recovery with alert downgrade/resolution.

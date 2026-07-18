@@ -47,6 +47,8 @@ test("Production acceptance A — confirmed imports persist and audit", async ({
   await expect(
     page.getByRole("link", { name: "View Customers" }),
   ).toBeVisible();
+  await openAnotherImport(page);
+  await confirmedImport(page, "transactions", "transactions.csv");
   await page.getByRole("link", { name: "Audit Reports" }).click();
   await expect(
     page.getByText("Operational import committed", { exact: false }).first(),
@@ -257,4 +259,39 @@ test("Production acceptance D — navigation explanations, next actions, mobile 
   await expect(page.getByRole("link", { name: "Data Imports" })).toBeVisible();
   await page.getByRole("link", { name: "Data Imports" }).click();
   await expect(page.locator(".workflow-steps")).toBeVisible();
+});
+
+test("Production acceptance E — Omar recovery recalculates risk and resolves or downgrades alert", async ({
+  page,
+}) => {
+  await reset(page, "/actions?actionId=ACT-024", "Administrator");
+  await page.locator("#ACT-024").click();
+  const initialRisk = await page.locator("#ACT-024 td").nth(1).innerText();
+  await page.getByRole("button", { name: "Start Action" }).click();
+  await page.getByRole("button", { name: "Confirm Execution" }).click();
+  await page
+    .getByLabel("Customer response")
+    .fill("The replacement arrived and our next purchase is confirmed");
+  await page.getByRole("button", { name: "Record Response" }).click();
+  await page.getByLabel("Action outcome").selectOption("Purchase completed");
+  await page
+    .getByLabel("Outcome notes")
+    .fill(
+      "Positive response and purchase completion recorded with supporting response",
+    );
+  await page
+    .getByRole("button", { name: /Record Outcome and Recalculate Risk/ })
+    .click();
+  await page.getByRole("link", { name: "Customers" }).click();
+  const omar = page.locator("tr", { hasText: "Omar Aziz" });
+  await expect(omar).toBeVisible();
+  await expect(omar).not.toContainText(initialRisk);
+  await omar.click();
+  await expect(
+    page.getByText("Monitored", { exact: true }).first(),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Audit Reports" }).click();
+  await expect(page.getByText(/Score \d+ -> \d+/).first()).toBeVisible();
+  await page.getByRole("link", { name: "Analytics" }).click();
+  await expect(page.getByText("Successful recovery · Omar Aziz")).toBeVisible();
 });
