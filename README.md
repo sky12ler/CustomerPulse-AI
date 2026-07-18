@@ -33,7 +33,7 @@ Customer risk signals are commonly split across purchases, complaints, conversat
 | OpenAI Responses API      | `OpenAIProvider` strict-schema request and validation contract verified with an injected transport; no external API call claimed               |
 | Campaign scheduling       | `DemoSocialPublisher` approval and idempotency verified; result labelled simulated                                                             |
 | Buffer                    | Adapter implemented and code-reviewed; live Buffer account and publishing not credential-tested                                                |
-| Demo workflow state       | In-memory for a frictionless demonstration; resets on reload                                                                                   |
+| Demo workflow state       | Shared localStorage-backed domain store; role, imports, actions, campaign draft, approvals, posts, audit and walkthrough persist after refresh |
 | Supabase                  | Normalized migration, RLS policies, seed SQL, SDK dependencies, and reset loader included; UI persistence is not connected or runtime-verified |
 | WhatsApp and email        | Approved, consent-gated user-initiated links; no automatic sending or live ingestion                                                           |
 | Image generation/cropping | Not implemented; documented as optional future work                                                                                            |
@@ -70,7 +70,7 @@ OPENAI_MODEL=gpt-5.6
 BUFFER_API_KEY=
 ```
 
-Supabase variables are used by the reset tooling, not by the current in-memory UI runtime. See [Deployment](docs/DEPLOYMENT.md) before configuring external services.
+Supabase variables are used by the reset tooling, not by the current localStorage-backed demo runtime. See [Deployment](docs/DEPLOYMENT.md) before configuring external services.
 
 ## Demo roles and optional seeded accounts
 
@@ -84,13 +84,19 @@ The no-credential demo uses the visible **Demo account** selector. If the Supaba
 | `account.executive@customerpulse.demo` | Account Executive |
 | `auditor@customerpulse.demo`           | Auditor / Viewer  |
 
-The current UI does not authenticate against those Supabase users.
+The current UI does not authenticate against those Supabase users; it uses the persisted Switch Role demo control.
 
 ## Mock data and imports
 
 Permanent synthetic fixtures live in [`mock-data`](mock-data) and remain downloadable from Data Imports. They include customer, transaction, conversation, product, campaign-result, grounding-document, and campaign-image files. The fixture set contains 30 customers, all four tiers, transaction dates spanning at least 12 months, multiple channels and product categories, and the evidence needed for Scenarios A–D.
 
 `node scripts/reset-demo.mjs --confirm` is a guarded loader for an explicitly configured Supabase project. `supabase db reset` applies the migration and `supabase/seed.sql` to a disposable local Supabase environment. Neither command removes the permanent mock files. See [Data Imports](docs/DATA_IMPORTS.md) and [Mock Data](docs/MOCK_DATA.md).
+
+## Connected workflows
+
+Customer records now share one browser-persisted chain: Recommendation → Retention Action → Approval → Execution → Outcome → Analytics/Audit. Marketing uses the same pattern: Marketing Trigger → Campaign Draft/Versions → Approval → ScheduledPost records → Campaign Calendar/Audit. Query parameters select and highlight linked records, and a reusable Workflow Guide states the current step, missing requirements, expected outcome, and next action. Overview includes non-blocking guided walkthroughs for Scenarios A and C.
+
+The Data Import Centre is a four-stage wizard with type-specific RBAC. Invalid API responses and validation failures remain understandable, while confirmed imports create persistent Import History and audit records. Document parsers are loaded only for their formats so CSV uploads do not initialize PDF/DOCX runtimes.
 
 ## Demo scenarios
 
@@ -114,7 +120,7 @@ npm audit
 Final verification passed:
 
 - **47/47 unit tests** across imports, tier/churn boundaries, AVO safeguards, workflows, scenarios, publisher behavior, mock data, and required Supabase security structure.
-- **9/9 production-browser workflows** across all routes/RBAC, AVO Chat, all permanent mock imports, Scenarios A–D, approval and consent bypass attempts, downloads, governance, settings, and audit controls.
+- **26/26 production-browser tests** cover all numbered workflow acceptance cases, Scenarios A–D, persistence, multipart CSV/PDF imports, approval/execution gates, shared calendar records, audit history, guided demos, and mobile navigation.
 - Lint, strict type checking, production build, and dependency audit; the audit reported zero vulnerabilities at verification time.
 
 See [Testing](docs/TESTING.md) and [Final handoff](docs/FINAL_HANDOFF.md).
@@ -133,6 +139,6 @@ The application’s live AVO adapter targets the OpenAI Responses API with `OPEN
 
 ## Limitations and future development
 
-The current demo resets workflow mutations on reload. Live Supabase Auth/persistence/Storage, two-tenant runtime testing, live GPT-5.6 evaluation, credential-tested Buffer publishing/status/retries, persistent tracking analytics, Realtime, automatic campaign-image processing, AI image generation, live WhatsApp/email ingestion, CRM integration, and autonomous outreach are not implemented or verified. Future development should preserve the existing evidence, consent, authorization, approval, and audit boundaries.
+The credential-free demo persists workflow mutations and the selected role in browser localStorage; Reset Demo restores the seeded state. Live Supabase Auth/persistence/Storage, two-tenant runtime testing, live GPT-5.6 evaluation, credential-tested Buffer publishing/status/retries, persistent tracking analytics, Realtime, automatic campaign-image processing, AI image generation, live WhatsApp/email ingestion, CRM integration, and autonomous outreach are not implemented or verified. Future development should preserve the existing evidence, consent, authorization, approval, and audit boundaries.
 
 For submission-ready copy, use [Devpost Submission](docs/DEVPOST_SUBMISSION.md). For the walkthrough, use the [under-three-minute Demo Script](docs/DEMO_SCRIPT.md).

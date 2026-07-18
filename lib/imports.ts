@@ -1,7 +1,4 @@
 import Papa from "papaparse";
-import ExcelJS from "exceljs";
-import mammoth from "mammoth";
-import { PDFParse } from "pdf-parse";
 
 export type ImportKind =
   | "customers"
@@ -238,8 +235,9 @@ async function parseRows(ext: string, b: Buffer) {
     };
   }
   if (ext === "xlsx") {
+    const { default: ExcelJS } = await import("exceljs");
     const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(b as unknown as ExcelJS.Buffer);
+    await wb.xlsx.load(b as unknown as Parameters<typeof wb.xlsx.load>[0]);
     const ws = wb.worksheets[0];
     if (!ws)
       return {
@@ -484,6 +482,7 @@ export async function validateImportFile(
   }
   if (ext === "pdf") {
     try {
+      const { PDFParse } = await import("pdf-parse");
       const parser = new PDFParse({ data: new Uint8Array(b) });
       const result = await parser.getText();
       await parser.destroy();
@@ -545,6 +544,7 @@ export async function validateImportFile(
   }
   if (ext === "docx") {
     try {
+      const { default: mammoth } = await import("mammoth");
       const result = await mammoth.extractRawText({ buffer: b });
       const text = result.value.trim();
       return {

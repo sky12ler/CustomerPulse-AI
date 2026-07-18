@@ -1,7 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState } from "react";
-import Link from "next/link";
+import { createContext, useContext, useEffect, useState } from "react";
 import {
   AlertTriangle,
   Archive,
@@ -18,7 +17,6 @@ import {
   Gauge,
   Import,
   LayoutDashboard,
-  Mail,
   Menu,
   MessageCircle,
   Search,
@@ -33,30 +31,32 @@ import {
 import {
   Area,
   AreaChart,
-  Bar,
-  BarChart,
   CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import {
-  audits,
-  customers,
-  demoAccounts,
-  recommendations,
-  riskChart,
-  tiersChart,
-  trendChart,
-} from "@/lib/demo-data";
+import { audits, customers, demoAccounts, trendChart } from "@/lib/demo-data";
 import type { AVOAnalysis } from "@/lib/avo";
 import type { Customer, Role } from "@/lib/types";
-import { canOutreach, detectSegmentDecline, whatsappLink } from "@/lib/engines";
-import { templates as importTemplates, type ImportResult } from "@/lib/imports";
+import type { ImportResult } from "@/lib/imports";
+import {
+  DemoWorkflowProvider,
+  useDemoWorkflow,
+} from "@/components/workflow-context";
+import { WorkflowGuide } from "@/components/workflow-guide";
+import { ActionsV2, RecommendationsV2 } from "@/components/retention-workflow";
+import {
+  GuidedWalkthrough,
+  WalkthroughLauncher,
+} from "@/components/guided-walkthrough";
+import {
+  AnalyticsV2,
+  CalendarV2,
+  CampaignStudioV2,
+  MarketingV2,
+} from "@/components/marketing-workflow";
 
 const nav = [
   [
@@ -154,6 +154,65 @@ const titles: Record<string, [string, string]> = {
     "Organisation roles, scoring thresholds and integrations.",
   ],
 };
+const accessByRole: Record<Role, string[]> = {
+  Administrator: Object.keys(titles),
+  "Sales Manager": [
+    "overview",
+    "alerts",
+    "customers",
+    "conversations",
+    "imports",
+    "avo",
+    "recommendations",
+    "actions",
+    "analytics",
+    "governance",
+    "audit",
+  ],
+  "Marketing Manager": [
+    "overview",
+    "customers",
+    "conversations",
+    "imports",
+    "avo",
+    "marketing",
+    "campaign-studio",
+    "campaign-calendar",
+    "analytics",
+    "governance",
+    "audit",
+  ],
+  "Account Executive": [
+    "overview",
+    "customers",
+    "conversations",
+    "imports",
+    "avo",
+    "recommendations",
+    "actions",
+    "audit",
+  ],
+  Auditor: [
+    "overview",
+    "alerts",
+    "customers",
+    "conversations",
+    "recommendations",
+    "actions",
+    "marketing",
+    "campaign-calendar",
+    "analytics",
+    "governance",
+    "audit",
+  ],
+};
+const requiredRoles: Record<string, string> = {
+  imports:
+    "Administrator, Sales Manager, Marketing Manager, or Account Executive (type-specific)",
+  "campaign-studio": "Administrator or Marketing Manager",
+  "campaign-calendar": "Administrator, Marketing Manager, or Auditor",
+  settings: "Administrator",
+};
 const money = (n: number) =>
   new Intl.NumberFormat("en-MY", {
     style: "currency",
@@ -206,110 +265,81 @@ const useWorkflow = () => {
 };
 
 export function Dashboard({ initialPage }: { initialPage: string }) {
+  return (
+    <DemoWorkflowProvider>
+      <DashboardInner initialPage={initialPage} />
+    </DemoWorkflowProvider>
+  );
+}
+
+function DashboardInner({ initialPage }: { initialPage: string }) {
+  const demo = useDemoWorkflow();
+  const { state } = demo;
+  const role = state.role;
   const [page, setPage] = useState(
     titles[initialPage] ? initialPage : "overview",
   );
-  const [role, setRole] = useState<Role>("Sales Manager");
   const [toast, setToast] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [actionStatus, setActionStatus] = useState("Pending Approval"),
-    [campaignStatus, setCampaignStatus] = useState("Draft"),
-    [recommendationStatuses, setRecommendationStatuses] = useState<
-      Record<string, string>
-    >({ "REC-001": "Draft", "REC-002": "Draft" });
-  const [events, setEvents] = useState(audits),
-    [imports, setImports] = useState<ImportResult[]>([]),
-    [requests, setRequests] = useState<string[]>([]),
-    [thresholds, setThresholds] = useState({
-      high: 60,
-      critical: 80,
-      riskSegment: 20,
-      revenue: 15,
-      frequency: 20,
-      engagement: 25,
-    });
-  const go = (p: string) => {
-    setPage(p);
-    window.history.pushState({}, "", `/${p}`);
+
+  useEffect(() => {
+    const syncRoute = () => {
+      const route = window.location.pathname.split("/").filter(Boolean)[0];
+      setPage(titles[route] ? route : "overview");
+    };
+    window.addEventListener("popstate", syncRoute);
+    return () => window.removeEventListener("popstate", syncRoute);
+  }, []);
+
+  const go = (destination: string) => {
+    const [route] = destination.replace(/^\//, "").split("?");
+    setPage(titles[route] ? route : "overview");
+    window.history.pushState(
+      {},
+      "",
+      destination.startsWith("/") ? destination : `/${destination}`,
+    );
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-  const notify = (m: string) => {
-    setToast(m);
-    setTimeout(() => setToast(""), 3200);
+  const notify = (message: string) => {
+    setToast(message);
+    setTimeout(() => setToast(""), 4200);
   };
-  const log = (action: string, entity: string, result: string) =>
-    setEvents((old) => [
-      {
-        id: `AUD-${9300 + old.length}`,
-        actor:
-          role === "Administrator"
-            ? "Demo Administrator"
-            : role === "Marketing Manager"
-              ? "Mina Lee"
-              : role === "Sales Manager"
-                ? "Farah Chen"
-                : role === "Account Executive"
-                  ? "Aisha Rahman"
-                  : "Demo Auditor",
-        role,
-        action,
-        entity,
-        result,
-        at: new Date().toISOString().replace("T", " ").slice(0, 16),
-        correlationId: `COR-DEMO-${Date.now()}`,
-      },
-      ...old,
-    ]);
-  const reset = () => {
-    setActionStatus("Pending Approval");
-    setCampaignStatus("Draft");
-    setRecommendationStatuses({ "REC-001": "Draft", "REC-002": "Draft" });
-    setImports([]);
-    setRequests([]);
-    setThresholds({
-      high: 60,
-      critical: 80,
-      riskSegment: 20,
-      revenue: 15,
-      frequency: 20,
-      engagement: 25,
-    });
-    log("Seeded demo reset", "CustomerPulse Demo", "Success");
-  };
+  const legacyAction = state.actions.find((item) => item.id === "ACT-021");
   const workflow: Workflow = {
-    actionStatus,
-    campaignStatus,
-    recommendationStatuses,
-    events,
-    imports,
-    requests,
-    thresholds,
-    setAction: (s) => {
-      setActionStatus(s);
-      log(`Retention action ${s.toLowerCase()}`, "ACT-021", s);
-    },
-    setCampaign: (s) => {
-      setCampaignStatus(s);
-      log(`Campaign ${s.toLowerCase()}`, "CAM-003", s);
-    },
-    setRecommendation: (id, s) => {
-      setRecommendationStatuses((x) => ({ ...x, [id]: s }));
-      log(`Recommendation ${s.toLowerCase()}`, id, s);
-    },
-    addImport: (r) => {
-      setImports((x) => [r, ...x]);
-      log("Data import confirmed", r.filename, `${r.validCount} valid`);
-    },
-    addRequest: (s) => {
-      setRequests((x) => [s, ...x]);
-      log("Governance request created", s, "Pending review");
-    },
-    log,
-    saveThresholds: (x) => {
-      setThresholds(x);
-      log("Governance setting change", "Scoring thresholds", "Success");
-    },
-    reset,
+    actionStatus: legacyAction?.status ?? "Draft",
+    campaignStatus: state.campaign.status,
+    recommendationStatuses: state.recommendationStatuses,
+    events: state.events,
+    imports: state.imports.map((item) => item.result),
+    requests: state.requests,
+    thresholds: state.thresholds,
+    setAction: (status) =>
+      demo.update((current) => ({
+        ...current,
+        actions: current.actions.map((item) =>
+          item.id === "ACT-021" ? { ...item, status: status as never } : item,
+        ),
+      })),
+    setCampaign: (status) => demo.updateCampaign({ status: status as never }),
+    setRecommendation: (id, status) =>
+      demo.update((current) => ({
+        ...current,
+        recommendationStatuses: {
+          ...current.recommendationStatuses,
+          [id]: status,
+        },
+      })),
+    addImport: (result) => void demo.addImport(result, result.kind),
+    addRequest: (request) =>
+      demo.update((current) => ({
+        ...current,
+        requests: [request, ...current.requests],
+      })),
+    log: demo.log,
+    saveThresholds: (thresholds) =>
+      demo.update((current) => ({ ...current, thresholds })),
+    reset: demo.reset,
   };
   const [title, sub] = titles[page];
   return (
@@ -325,21 +355,23 @@ export function Dashboard({ initialPage }: { initialPage: string }) {
           {nav.map(([group, items]) => (
             <div key={group}>
               <div className="nav-group">{group}</div>
-              {items.map(([key, label, Icon]) => (
-                <a
-                  key={key}
-                  href={`/${key}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    go(key);
-                    setMobileOpen(false);
-                  }}
-                  className={`nav-link ${page === key ? "active" : ""}`}
-                >
-                  <Icon />
-                  {label}
-                </a>
-              ))}
+              {items
+                .filter(([key]) => accessByRole[role].includes(key))
+                .map(([key, label, Icon]) => (
+                  <a
+                    key={key}
+                    href={`/${key}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      go(key);
+                      setMobileOpen(false);
+                    }}
+                    className={`nav-link ${page === key ? "active" : ""}`}
+                  >
+                    <Icon />
+                    {label}
+                  </a>
+                ))}
             </div>
           ))}
         </aside>
@@ -366,7 +398,7 @@ export function Dashboard({ initialPage }: { initialPage: string }) {
                 className="input"
                 value={role}
                 onChange={(e) => {
-                  setRole(e.target.value as Role);
+                  demo.setRole(e.target.value as Role);
                   notify(`Signed in as ${e.target.value} demo account`);
                 }}
               >
@@ -401,6 +433,7 @@ export function Dashboard({ initialPage }: { initialPage: string }) {
             <Page page={page} go={go} notify={notify} role={role} />
           </div>
         </main>
+        <GuidedWalkthrough page={page} go={go} />
         {toast && (
           <div role="status" className="toast">
             <CheckCircle2
@@ -426,55 +459,7 @@ function Page({
   notify: (m: string) => void;
   role: Role;
 }) {
-  const access: Record<Role, string[]> = {
-    Administrator: Object.keys(titles),
-    "Sales Manager": [
-      "overview",
-      "alerts",
-      "customers",
-      "conversations",
-      "avo",
-      "recommendations",
-      "actions",
-      "analytics",
-      "governance",
-      "audit",
-    ],
-    "Marketing Manager": [
-      "overview",
-      "customers",
-      "conversations",
-      "avo",
-      "marketing",
-      "campaign-studio",
-      "campaign-calendar",
-      "analytics",
-      "governance",
-      "audit",
-    ],
-    "Account Executive": [
-      "overview",
-      "customers",
-      "conversations",
-      "avo",
-      "recommendations",
-      "actions",
-    ],
-    Auditor: [
-      "overview",
-      "alerts",
-      "customers",
-      "conversations",
-      "recommendations",
-      "actions",
-      "marketing",
-      "campaign-calendar",
-      "analytics",
-      "governance",
-      "audit",
-    ],
-  };
-  if (!access[role].includes(page))
+  if (!accessByRole[role].includes(page))
     return (
       <div className="card empty">
         <ShieldCheck size={34} />
@@ -482,6 +467,13 @@ function Page({
         <p>
           {role} does not have permission to open {titles[page][0]}.
         </p>
+        <p>
+          <strong>Required role:</strong>{" "}
+          {requiredRoles[page] ?? "An authorised operational role"}
+        </p>
+        <button className="btn btn-primary" onClick={() => go("overview")}>
+          Open permitted Overview
+        </button>
       </div>
     );
   switch (page) {
@@ -498,17 +490,17 @@ function Page({
     case "avo":
       return <AVOChat notify={notify} />;
     case "recommendations":
-      return <Recommendations notify={notify} />;
+      return <RecommendationsV2 notify={notify} go={go} />;
     case "actions":
-      return <Actions notify={notify} role={role} />;
+      return <ActionsV2 notify={notify} role={role} go={go} />;
     case "marketing":
-      return <Marketing go={go} />;
+      return <MarketingV2 go={go} notify={notify} />;
     case "campaign-studio":
-      return <CampaignStudio notify={notify} role={role} />;
+      return <CampaignStudioV2 notify={notify} role={role} go={go} />;
     case "campaign-calendar":
-      return <Calendar />;
+      return <CalendarV2 go={go} notify={notify} />;
     case "analytics":
-      return <Analytics />;
+      return <AnalyticsV2 go={go} />;
     case "governance":
       return <Governance notify={notify} />;
     case "audit":
@@ -526,6 +518,7 @@ function Overview({ go }: { go: (p: string) => void }) {
   );
   return (
     <>
+      <WalkthroughLauncher go={go} />
       <div className="grid stats">
         {[
           ["Customers monitored", "30", "All synthetic records", Users],
@@ -1462,407 +1455,648 @@ function AnalysisPanel({
 }
 
 function Imports({ notify }: { notify: (s: string) => void }) {
-  const [step, setStep] = useState(0),
-    [filename, setFilename] = useState(""),
-    [result, setResult] = useState<ImportResult | null>(null),
-    [sourceFile, setSourceFile] = useState<File | null>(null),
-    [mapping, setMapping] = useState<Record<string, string>>({}),
-    [loading, setLoading] = useState(false),
-    [blankKind, setBlankKind] = useState("customers");
-  const workflow = useWorkflow();
-  const demoFiles = [
-    "customers.csv",
-    "transactions.csv",
-    "conversations.csv",
-    "conversations.json",
-    "products.csv",
-    "campaign-results.csv",
-    "retention-playbook.pdf",
-    "customer-service-policy.pdf",
-    "product-catalogue.pdf",
-    "marketing-guidelines.pdf",
-    "existing-campaign.png",
-  ];
-  const upload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
+  const demo = useDemoWorkflow();
+  const role = demo.state.role;
+  const [step, setStep] = useState(0);
+  const [kind, setKind] = useState<keyof typeof importOptions>("customers");
+  const [file, setFile] = useState<File | null>(null);
+  const [result, setResult] = useState<ImportResult | null>(null);
+  const [mapping, setMapping] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [successId, setSuccessId] = useState("");
+  const allowed = canImport(role, kind);
+  const option = importOptions[kind];
+
+  async function validate(selected: File) {
     setLoading(true);
-    setFilename(f.name);
-    setSourceFile(f);
+    setError("");
+    setFile(selected);
     const form = new FormData();
-    form.set("file", f);
-    try {
-      const r = await fetch("/api/imports/validate", {
-          method: "POST",
-          body: form,
-        }),
-        data = await r.json();
-      if (data.error) throw new Error(data.error);
-      setResult(data);
-      setMapping(
-        Object.fromEntries(
-          (data.headers as string[]).map((header) => [header, header]),
-        ),
-      );
-      setStep(1);
-      notify(
-        data.valid
-          ? `${f.name} parsed and validated`
-          : `${f.name} contains validation errors`,
-      );
-    } catch (err) {
-      notify(err instanceof Error ? err.message : "Import validation failed");
-      setStep(0);
-    } finally {
-      setLoading(false);
-      e.target.value = "";
-    }
-  };
-  const errorReport = () => {
-    if (!result) return;
-    const text =
-      "row,field,code,message,value\n" +
-      result.errors
-        .map((e) =>
-          [e.row, e.field, e.code, e.message, String(e.value ?? "")]
-            .map((v) => `\"${String(v).replaceAll('"', '""')}\"`)
-            .join(","),
-        )
-        .join("\n");
-    downloadText(`${filename}-errors.csv`, text, "text/csv");
-    notify(`Downloaded ${result.errors.length} validation errors`);
-  };
-  const applyMapping = async () => {
-    if (!sourceFile || !result?.headers.length) return setStep(2);
-    setLoading(true);
-    const form = new FormData();
-    form.set("file", sourceFile);
-    form.set("mapping", JSON.stringify(mapping));
+    form.set("file", selected);
     try {
       const response = await fetch("/api/imports/validate", {
         method: "POST",
         body: form,
       });
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
+      const contentType = response.headers.get("content-type") ?? "";
+      if (!contentType.includes("application/json")) {
+        throw new Error(
+          `Upload service returned ${response.status} instead of JSON. Try again or contact the administrator.`,
+        );
+      }
+      const data = (await response.json()) as ImportResult & { error?: string };
+      if (data.error)
+        throw new Error(data.error || `Validation failed (${response.status})`);
       setResult(data);
+      setMapping(
+        Object.fromEntries(data.headers.map((header) => [header, header])),
+      );
       setStep(2);
       notify(
         data.valid
-          ? "Column mapping applied and rows revalidated"
-          : "Mapped columns contain validation errors",
+          ? `${selected.name} validated successfully`
+          : `${selected.name} has validation errors`,
       );
-    } catch (error) {
-      notify(error instanceof Error ? error.message : "Mapping failed");
+    } catch (caught) {
+      const message =
+        caught instanceof Error ? caught.message : "Import validation failed";
+      setError(message);
+      notify(message);
     } finally {
       setLoading(false);
     }
+  }
+
+  const pick = (selected?: File) => {
+    if (!selected) return;
+    if (!allowed)
+      return setError(
+        `${role} cannot upload ${option.label}. ${option.roles} required.`,
+      );
+    void validate(selected);
+  };
+  const downloadTemplate = (populated: boolean) => {
+    if (populated) {
+      window.location.href = `/api/demo-files/${option.example}`;
+      return;
+    }
+    downloadText(
+      `${kind}-blank.${option.blankExt}`,
+      option.blank,
+      option.blankExt === "csv" ? "text/csv" : "text/plain",
+    );
+  };
+  const errorReport = () => {
+    if (!result) return;
+    downloadText(
+      `${file?.name ?? "import"}-errors.csv`,
+      `row,field,code,message\n${result.errors.map((item) => `${item.row},${item.field},${item.code},"${item.message.replaceAll('"', '""')}"`).join("\n")}`,
+      "text/csv",
+    );
   };
   const confirm = () => {
     if (!result?.valid)
-      return notify("Resolve validation errors before confirmation");
-    workflow.addImport(result);
-    notify(
-      `Import confirmed and audited — ${result.validCount} records accepted`,
-    );
-    setStep(0);
+      return setError("Resolve validation errors before confirmation.");
+    const id = demo.addImport(result, kind);
+    setSuccessId(id);
+    notify("Import completed successfully.");
+  };
+  const clearFile = () => {
+    setFile(null);
     setResult(null);
-    setFilename("");
-    setSourceFile(null);
-    setMapping({});
+    setError("");
+    setStep(1);
   };
-  const blankHeaders: Record<string, string> = {
-    customers:
-      "customer_external_id,customer_name,company_name,industry,region,assigned_staff_email,email,phone,preferred_channel,consent_status,customer_since\n",
-    transactions:
-      "transaction_id,customer_external_id,transaction_date,product_sku,product_name,category,quantity,unit_price,total_amount\n",
-    conversations:
-      "conversation_id,message_id,customer_external_id,channel,sender_type,sender_name,message_text,sent_at\n",
-    products:
-      "product_sku,product_name,category,description,standard_price,promotion_price,promotion_start,promotion_end,inventory_status,product_url\n",
+  const nextLinks: Record<string, [string, string]> = {
+    customers: ["View Customers", "/customers"],
+    transactions: ["Recalculate Tiers and Churn", "/analytics"],
+    conversations: ["Analyse with AVO", "/conversations"],
+    products: ["Open Campaign Sources", "/campaign-studio?step=3"],
+    marketing_guidelines: ["Open Campaign Studio", "/campaign-studio?step=3"],
+    product_catalogue: ["Open Campaign Studio", "/campaign-studio?step=3"],
   };
-  return (
-    <div className="grid two">
-      <div className="card">
-        <div className="card-head">
-          <h2>New import</h2>
-          <span className="badge medium">Administrator</span>
-        </div>
-        <div className="tabs">
-          {["1 Upload", "2 Preview & map", "3 Validate", "4 Confirm"].map(
-            (x, i) => (
-              <span className={`tab ${step === i ? "active" : ""}`} key={x}>
-                {x}
-              </span>
-            ),
-          )}
-        </div>
-        {step === 0 ? (
-          <label
-            className="upload-zone"
-            style={{ display: "block", cursor: loading ? "wait" : "pointer" }}
-          >
-            <Upload size={30} color="#19766e" />
-            <h3 style={{ marginTop: 10 }}>
-              {loading
-                ? "Scanning and parsing…"
-                : "Upload an authorised data file"}
-            </h3>
-            <p className="subtle">
-              CSV, XLSX, JSON, TXT, PDF, DOCX, PNG or JPG · max 10 MB
-            </p>
-            <input
-              aria-label="Import file"
-              type="file"
-              hidden
-              disabled={loading}
-              onChange={upload}
+  if (successId && result) {
+    const next = nextLinks[kind] ?? [
+      "View Import History",
+      "/imports?view=history",
+    ];
+    return (
+      <div className="grid two">
+        <div className="card success-panel" role="status">
+          <CheckCircle2 size={36} />
+          <h2>Import completed successfully.</h2>
+          <p>
+            {result.validCount} {option.label.toLowerCase()} records were added.
+          </p>
+          <div className="grid three">
+            <Metric label="Import ID" value={successId} />
+            <Metric label="Records added" value={String(result.validCount)} />
+            <Metric
+              label="Records rejected"
+              value={String(result.invalidCount)}
             />
-            <span className="btn btn-primary">Choose file</span>
-          </label>
-        ) : step === 1 && result ? (
-          <div>
-            <div className={`notice ${result.valid ? "" : "danger"}`}>
-              <strong>{filename}</strong> · {result.kind.replaceAll("_", " ")} ·{" "}
-              {(result.size / 1024).toFixed(1)} KB ·{" "}
-              {result.valid
-                ? "signature and validation passed"
-                : "review errors"}
-            </div>
-            <div className="divider" />
-            <h3>
-              {result.headers.length
-                ? "Column mapping and preview"
-                : "Extracted document metadata"}
-            </h3>
-            {result.headers.map((h) => (
-              <div className="split evidence" key={h}>
-                <span>{h}</span>
-                <select
-                  aria-label={`Map ${h}`}
-                  className="input"
-                  style={{ width: 190 }}
-                  value={mapping[h] ?? h}
-                  onChange={(event) =>
-                    setMapping((current) => ({
-                      ...current,
-                      [h]: event.target.value,
-                    }))
-                  }
-                >
-                  {result.kind in importTemplates ? (
-                    importTemplates[
-                      result.kind as keyof typeof importTemplates
-                    ].map((field) => <option key={field}>{field}</option>)
-                  ) : (
-                    <option>{h}</option>
-                  )}
-                  <option value="__ignore__">Ignore column</option>
-                </select>
-              </div>
-            ))}
-            <div className="table-wrap">
-              <table className="table">
-                <tbody>
-                  {result.preview.map((row, i) => (
-                    <tr key={i}>
-                      {Object.entries(row)
-                        .slice(0, 5)
-                        .map(([k, v]) => (
-                          <td key={k}>
-                            <span className="evidence-id">{k}</span>
-                            <div>{String(v ?? "")}</div>
-                          </td>
-                        ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {result.extractedText && (
-              <div className="evidence">
-                <span className="evidence-id">EXTRACTED TEXT PREVIEW</span>
-                <div>{result.extractedText.slice(0, 500)}</div>
-              </div>
-            )}
-            <button
-              className="btn btn-primary"
-              disabled={loading}
-              onClick={applyMapping}
-            >
-              {loading ? "Revalidating…" : "Review validation result"}
-            </button>
           </div>
-        ) : step === 2 && result ? (
-          <div>
-            <div className={`notice ${result.valid ? "" : "danger"}`}>
-              {result.validCount} valid · {result.duplicateCount} duplicates ·{" "}
-              {result.invalidCount} invalid
-            </div>
-            <div className="grid three" style={{ margin: "18px 0" }}>
-              <div className="card">
-                <strong>{result.validCount}</strong>
-                <div className="subtle">Ready</div>
-              </div>
-              <div className="card">
-                <strong>{result.duplicateCount}</strong>
-                <div className="subtle">Duplicates</div>
-              </div>
-              <div className="card">
-                <strong>{result.invalidCount}</strong>
-                <div className="subtle">Invalid</div>
-              </div>
-            </div>
-            {result.errors.slice(0, 5).map((e) => (
-              <div className="evidence" key={`${e.row}-${e.field}-${e.code}`}>
-                <span className="evidence-id">
-                  ROW {e.row} · {e.field} · {e.code}
-                </span>
-                <div>{e.message}</div>
-              </div>
-            ))}
-            <button
-              className="btn btn-primary"
-              disabled={!result.valid}
-              onClick={() => setStep(3)}
-            >
-              Continue to confirmation
-            </button>{" "}
-            <button className="btn btn-outline" onClick={errorReport}>
-              Download error report
-            </button>{" "}
-            <button
-              className="btn btn-outline"
-              onClick={() => {
-                setStep(0);
-                setResult(null);
-                setSourceFile(null);
-                setMapping({});
-              }}
-            >
-              Cancel
-            </button>
+          <div className="notice">
+            Affected customers:{" "}
+            {result.kind === "customers" ? result.validCount : "linked records"}{" "}
+            · Calculations triggered: tier/churn refresh · Audit event created.
           </div>
-        ) : result ? (
-          <div>
-            <div className="notice warning">
-              Confirmation records uploader, confirmer, mapping, source metadata
-              and validation result in the session audit log.
-            </div>
-            <p>
-              <strong>Uploader / confirmer:</strong> Demo Administrator
-            </p>
-            <p>
-              <strong>File:</strong> {filename}
-            </p>
-            <p>
-              <strong>Result:</strong> {result.validCount} accepted ·{" "}
-              {result.pages
-                ? `${result.pages} pages · ${result.chunks?.length || 0} chunks`
-                : result.kind}
-            </p>
-            <button className="btn btn-primary" onClick={confirm}>
-              Confirm import
-            </button>{" "}
-            <button className="btn btn-outline" onClick={() => setStep(2)}>
-              Back
-            </button>
-          </div>
-        ) : null}
+          <a className="btn btn-primary" href={next[1]}>
+            {next[0]}
+          </a>{" "}
+          <button
+            className="btn btn-outline"
+            onClick={() => {
+              setSuccessId("");
+              clearFile();
+              setStep(0);
+            }}
+          >
+            Start another import
+          </button>
+        </div>
+        <ImportHistory />
       </div>
-      <div>
+    );
+  }
+  return (
+    <div>
+      <WorkflowGuide
+        title="Import workflow"
+        steps={[
+          "Select Import Type",
+          "Choose File",
+          "Preview and Validate",
+          "Confirm Import",
+        ]}
+        current={step}
+        missing={
+          error ||
+          (step === 0
+            ? "Select an authorised import type."
+            : step === 1 && !file
+              ? "Choose a file to continue."
+              : "")
+        }
+        expected="Validated records enter the shared demo store and create an audit event."
+      />
+      <div className="grid two">
         <div className="card">
           <div className="card-head">
+            <h2>
+              {step + 1}.{" "}
+              {
+                [
+                  "Select Import Type",
+                  "Choose File",
+                  "Preview and Validate",
+                  "Confirm Import",
+                ][step]
+              }
+            </h2>
+            {badge(role)}
+          </div>
+          {error && (
+            <div className="notice danger" role="alert">
+              {error}
+            </div>
+          )}
+          {step === 0 && (
             <div>
-              <h2>Demo Data and Templates</h2>
-              <div className="subtle">
-                Permanent synthetic files for manual import.
-              </div>
-            </div>
-            <span className="demo-label">Synthetic Demo Data</span>
-          </div>
-          {demoFiles.map((f) => (
-            <div
-              className="split"
-              style={{ padding: "9px 0", borderBottom: "1px solid #eef0ed" }}
-              key={f}
-            >
-              <div>
-                <strong style={{ fontSize: 12 }}>{f}</strong>
-                <div className="subtle" style={{ fontSize: 9 }}>
-                  {f.endsWith(".pdf")
-                    ? "Approved demo source document"
-                    : "Populated mock template"}
-                </div>
-              </div>
-              <a
-                className="btn btn-outline"
-                href={`/api/demo-files/${f}`}
-                download
+              <label className="field-label" htmlFor="import-kind">
+                Import type
+              </label>
+              <select
+                id="import-kind"
+                className="input"
+                value={kind}
+                onChange={(event) => {
+                  setKind(event.target.value as keyof typeof importOptions);
+                  setError("");
+                }}
               >
-                <Download size={13} /> Download
-              </a>
-            </div>
-          ))}
-          <div className="divider" />
-          <div className="top-actions">
-            <select
-              aria-label="Blank template type"
-              className="input"
-              value={blankKind}
-              onChange={(e) => setBlankKind(e.target.value)}
-            >
-              <option>customers</option>
-              <option>transactions</option>
-              <option>conversations</option>
-              <option>products</option>
-            </select>
-            <button
-              className="btn btn-outline"
-              onClick={() => {
-                downloadText(
-                  `${blankKind}-blank.csv`,
-                  blankHeaders[blankKind],
-                  "text/csv",
-                );
-                notify(`Downloaded blank ${blankKind} template`);
-              }}
-            >
-              Blank template
-            </button>
-            <button
-              className="btn btn-danger"
-              onClick={() => {
-                if (
-                  window.confirm(
-                    "Reset all session workflow changes and reload the seeded demo?",
-                  )
-                ) {
-                  workflow.reset();
-                  notify("Seeded demo session reloaded");
-                }
-              }}
-            >
-              Reset demo
-            </button>
-          </div>
-        </div>
-        {workflow.imports.length > 0 && (
-          <div className="card" style={{ marginTop: 14 }}>
-            <h2>Confirmed session imports</h2>
-            {workflow.imports.map((x, i) => (
-              <div className="evidence" key={`${x.filename}-${i}`}>
-                <span className="evidence-id">
-                  IMP-{String(i + 1).padStart(3, "0")} · {x.audit.at}
-                </span>
-                <div>
-                  {x.filename} · {x.kind} · {x.validCount} accepted
-                </div>
+                {Object.entries(importOptions).map(([value, meta]) => (
+                  <option key={value} value={value}>
+                    {meta.label}
+                  </option>
+                ))}
+              </select>
+              <div className="evidence">
+                <strong>{option.label}</strong>
+                <p>Accepted: {option.formats} · Maximum: 10 MB</p>
+                <p>
+                  <b>Required fields:</b> {option.required}
+                </p>
+                <p>
+                  <b>Use:</b> {option.use}
+                </p>
+                <p>
+                  <b>Access:</b> {option.roles}
+                </p>
               </div>
-            ))}
-          </div>
-        )}
+              {!allowed && (
+                <div className="notice warning">
+                  {role} is not authorised for this type. Switch to{" "}
+                  {option.roles}.
+                </div>
+              )}
+              <button
+                className="btn btn-outline"
+                onClick={() => downloadTemplate(false)}
+              >
+                <Download size={13} /> Download blank template
+              </button>{" "}
+              <button
+                className="btn btn-outline"
+                onClick={() => downloadTemplate(true)}
+              >
+                <Download size={13} /> Download populated mock example
+              </button>
+              <div className="divider" />
+              <button
+                className="btn btn-primary"
+                disabled={!allowed}
+                title={!allowed ? `${option.roles} required` : ""}
+                onClick={() => setStep(1)}
+              >
+                Continue
+              </button>
+              {!allowed && (
+                <p className="validation-help">
+                  Continue is unavailable because this role cannot upload{" "}
+                  {option.label}.
+                </p>
+              )}
+            </div>
+          )}
+          {step === 1 && (
+            <div>
+              <label
+                className="upload-zone"
+                tabIndex={0}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ")
+                    (
+                      event.currentTarget.querySelector(
+                        "input",
+                      ) as HTMLInputElement
+                    )?.click();
+                }}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  pick(event.dataTransfer.files[0]);
+                }}
+              >
+                <Upload size={30} />
+                <h3>
+                  {loading
+                    ? "Uploading and validating…"
+                    : "Drop file here or browse"}
+                </h3>
+                <p>{option.formats} · max 10 MB</p>
+                <input
+                  aria-label="Import file"
+                  type="file"
+                  onChange={(event) => pick(event.target.files?.[0])}
+                />
+                <span className="btn btn-primary">Browse Files</span>
+              </label>
+              {file && (
+                <div className="notice">
+                  <b>{file.name}</b> · {(file.size / 1024).toFixed(1)} KB ·{" "}
+                  {file.type || file.name.split(".").pop()?.toUpperCase()}
+                  <br />
+                  <progress max={100} value={loading ? 65 : 100} />
+                  <div>
+                    <button
+                      className="btn btn-outline"
+                      onClick={() =>
+                        document
+                          .querySelector<HTMLInputElement>(
+                            'input[aria-label="Import file"]',
+                          )
+                          ?.click()
+                      }
+                    >
+                      Replace file
+                    </button>{" "}
+                    <button className="btn btn-outline" onClick={clearFile}>
+                      Remove file
+                    </button>
+                  </div>
+                </div>
+              )}
+              <button className="btn btn-outline" onClick={() => setStep(0)}>
+                Back
+              </button>
+            </div>
+          )}
+          {step === 2 && result && (
+            <div>
+              <div className={`notice ${result.valid ? "" : "danger"}`}>
+                <b>{file?.name}</b> · {result.validCount} valid ·{" "}
+                {result.invalidCount} invalid · {result.duplicateCount}{" "}
+                duplicates
+              </div>
+              {result.headers.length > 0 ? (
+                <>
+                  <h3>Column mapping</h3>
+                  {result.headers.map((header) => (
+                    <div className="split evidence" key={header}>
+                      <span>{header}</span>
+                      <select
+                        aria-label={`Map ${header}`}
+                        className="input"
+                        value={mapping[header]}
+                        onChange={(e) =>
+                          setMapping({ ...mapping, [header]: e.target.value })
+                        }
+                      >
+                        <option>{header}</option>
+                        <option value="__ignore__">Ignore column</option>
+                      </select>
+                    </div>
+                  ))}
+                  <PreviewRows result={result} />
+                </>
+              ) : (
+                <>
+                  <h3>Document metadata</h3>
+                  <div className="grid three">
+                    <Metric label="Document type" value={result.fileType} />
+                    <Metric
+                      label="Pages"
+                      value={String(result.pages ?? "Preview unavailable")}
+                    />
+                    <Metric
+                      label="Chunks"
+                      value={String(result.chunks?.length ?? 0)}
+                    />
+                  </div>
+                  <div className="evidence">
+                    <b>Classification:</b> Internal · <b>Retention:</b> approved
+                    source<p>{result.extractedText?.slice(0, 600)}</p>
+                  </div>
+                </>
+              )}
+              {result.errors.map((item) => (
+                <div className="evidence" key={`${item.row}-${item.code}`}>
+                  <b>
+                    Row {item.row} · {item.field}
+                  </b>
+                  <div>{item.message}</div>
+                </div>
+              ))}
+              <button className="btn btn-outline" onClick={errorReport}>
+                Download error report
+              </button>{" "}
+              <button className="btn btn-outline" onClick={() => setStep(1)}>
+                Back
+              </button>{" "}
+              <button
+                className="btn btn-primary"
+                disabled={!result.valid}
+                title={!result.valid ? "Resolve validation errors first" : ""}
+                onClick={() => setStep(3)}
+              >
+                Continue
+              </button>
+              {!result.valid && (
+                <p className="validation-help">
+                  Continue is unavailable because the file contains validation
+                  errors.
+                </p>
+              )}
+            </div>
+          )}
+          {step === 3 && result && (
+            <div>
+              <div className="grid two">
+                <Metric label="Import type" value={option.label} />
+                <Metric label="File" value={file?.name ?? ""} />
+                <Metric
+                  label="Records to add"
+                  value={String(result.validCount)}
+                />
+                <Metric label="Records to update" value="0" />
+                <Metric
+                  label="Records to reject"
+                  value={String(result.invalidCount)}
+                />
+                <Metric
+                  label="Documents / chunks"
+                  value={String(
+                    result.chunks?.length ?? (result.pages ? 1 : 0),
+                  )}
+                />
+                <Metric label="Uploader" value={actorForDemoRole(role)} />
+                <Metric label="Timestamp" value={new Date().toLocaleString()} />
+              </div>
+              <label className="check">
+                <input type="checkbox" required id="confirm-import" /> I confirm
+                this authorised file may be imported.
+              </label>
+              <button className="btn btn-outline" onClick={() => setStep(2)}>
+                Back
+              </button>{" "}
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  const box =
+                    document.querySelector<HTMLInputElement>("#confirm-import");
+                  if (!box?.checked)
+                    setError("Confirmation is required before import.");
+                  else confirm();
+                }}
+              >
+                Confirm Import
+              </button>
+            </div>
+          )}
+        </div>
+        <ImportHistory />
       </div>
+    </div>
+  );
+}
+
+const importOptions = {
+  customers: {
+    label: "Customers",
+    formats: "CSV, XLSX, JSON",
+    required: "customer_external_id, customer_name, region, consent_status",
+    use: "Customer 360, tiering and churn scoring",
+    roles: "Administrator or Sales Manager",
+    example: "customers.csv",
+    blankExt: "csv",
+    blank:
+      "customer_external_id,customer_name,company_name,industry,region,consent_status\n",
+  },
+  transactions: {
+    label: "Transactions",
+    formats: "CSV, XLSX, JSON",
+    required:
+      "transaction_id, customer_external_id, transaction_date, total_amount",
+    use: "Revenue, frequency, tier and churn calculation",
+    roles: "Administrator or Sales Manager",
+    example: "transactions.csv",
+    blankExt: "csv",
+    blank:
+      "transaction_id,customer_external_id,transaction_date,total_amount\n",
+  },
+  conversations: {
+    label: "Conversations",
+    formats: "CSV, JSON",
+    required:
+      "conversation_id, message_id, customer_external_id, message_text, sent_at",
+    use: "Evidence-grounded AVO analysis",
+    roles: "Administrator, Sales Manager or assigned Account Executive",
+    example: "conversations.csv",
+    blankExt: "csv",
+    blank:
+      "conversation_id,message_id,customer_external_id,channel,message_text,sent_at\n",
+  },
+  products: {
+    label: "Products",
+    formats: "CSV, XLSX, JSON",
+    required: "product_sku, product_name, category, standard_price",
+    use: "Approved campaign facts and product records",
+    roles: "Administrator or Marketing Manager",
+    example: "products.csv",
+    blankExt: "csv",
+    blank: "product_sku,product_name,category,standard_price\n",
+  },
+  campaign_results: {
+    label: "Campaign results",
+    formats: "CSV, XLSX",
+    required: "campaign_id, channel, impressions, clicks",
+    use: "Campaign analytics",
+    roles: "Administrator or Marketing Manager",
+    example: "campaign-results.csv",
+    blankExt: "csv",
+    blank: "campaign_id,channel,impressions,clicks\n",
+  },
+  retention_playbook: {
+    label: "Retention playbook",
+    formats: "PDF, DOCX, TXT",
+    required: "Extractable approved guidance",
+    use: "Ground retention recommendations",
+    roles: "Administrator or Sales Manager",
+    example: "retention-playbook.pdf",
+    blankExt: "txt",
+    blank: "Approved retention guidance\n",
+  },
+  customer_service_policy: {
+    label: "Customer-service policy",
+    formats: "PDF, DOCX, TXT",
+    required: "Extractable policy text",
+    use: "Validate service-recovery actions",
+    roles: "Administrator or Sales Manager",
+    example: "customer-service-policy.pdf",
+    blankExt: "txt",
+    blank: "Approved customer-service policy\n",
+  },
+  product_catalogue: {
+    label: "Product catalogue",
+    formats: "PDF, DOCX",
+    required: "Extractable product facts",
+    use: "Ground campaign content",
+    roles: "Administrator or Marketing Manager",
+    example: "product-catalogue.pdf",
+    blankExt: "txt",
+    blank: "Approved product catalogue content\n",
+  },
+  marketing_guidelines: {
+    label: "Marketing guidelines",
+    formats: "PDF, DOCX, TXT",
+    required: "Extractable brand and claims guidance",
+    use: "Campaign policy validation",
+    roles: "Administrator or Marketing Manager",
+    example: "marketing-guidelines.pdf",
+    blankExt: "txt",
+    blank: "Approved marketing guidance\n",
+  },
+  campaign_asset: {
+    label: "Campaign asset",
+    formats: "PNG, JPG, PDF",
+    required: "Approved visual or document",
+    use: "Campaign creative source",
+    roles: "Administrator or Marketing Manager",
+    example: "existing-campaign.png",
+    blankExt: "txt",
+    blank: "Upload an approved campaign asset.\n",
+  },
+} as const;
+
+function canImport(role: Role, kind: keyof typeof importOptions) {
+  if (role === "Administrator") return true;
+  if (role === "Sales Manager")
+    return [
+      "customers",
+      "transactions",
+      "conversations",
+      "retention_playbook",
+      "customer_service_policy",
+    ].includes(kind);
+  if (role === "Marketing Manager")
+    return [
+      "products",
+      "product_catalogue",
+      "marketing_guidelines",
+      "campaign_asset",
+      "campaign_results",
+    ].includes(kind);
+  return role === "Account Executive" && kind === "conversations";
+}
+function actorForDemoRole(role: Role) {
+  return role === "Administrator"
+    ? "Demo Administrator"
+    : role === "Sales Manager"
+      ? "Farah Chen"
+      : role === "Marketing Manager"
+        ? "Mina Lee"
+        : role === "Account Executive"
+          ? "Aisha Rahman"
+          : "Demo Auditor";
+}
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="metric-mini">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+function PreviewRows({ result }: { result: ImportResult }) {
+  return (
+    <div className="table-wrap">
+      <table className="table">
+        <tbody>
+          {result.preview.slice(0, 5).map((row, index) => (
+            <tr key={index}>
+              {Object.entries(row)
+                .slice(0, 6)
+                .map(([key, value]) => (
+                  <td key={key}>
+                    <span className="evidence-id">{key}</span>
+                    <div>{String(value ?? "")}</div>
+                  </td>
+                ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+function ImportHistory() {
+  const { state } = useDemoWorkflow();
+  return (
+    <div className="card">
+      <h2>Import History</h2>
+      {state.imports.length === 0 ? (
+        <div className="empty">
+          <p>No confirmed imports in this demo session.</p>
+        </div>
+      ) : (
+        state.imports.map((item) => (
+          <div className="evidence" key={item.id}>
+            <div className="split">
+              <b>{item.id}</b>
+              {badge("Success")}
+            </div>
+            <div>
+              {item.filename} · {item.type}
+            </div>
+            <small>
+              {item.recordsAdded} added · {item.recordsRejected} rejected ·{" "}
+              {item.uploader}
+            </small>
+          </div>
+        ))
+      )}
     </div>
   );
 }
@@ -1965,857 +2199,6 @@ function AVOChat({ notify }: { notify: (s: string) => void }) {
         </div>
       </div>
     </div>
-  );
-}
-
-function Recommendations({ notify }: { notify: (s: string) => void }) {
-  const [expanded, setExpanded] = useState("REC-001");
-  const workflow = useWorkflow();
-  return (
-    <div className="grid two">
-      <div className="card">
-        <div className="card-head">
-          <h2>Recommendation queue</h2>
-          <span className="badge medium">Human review required</span>
-        </div>
-        {recommendations.map((r) => {
-          const c = customers.find((x) => x.id === r.customerId)!;
-          const status = workflow.recommendationStatuses[r.id] ?? r.status;
-          return (
-            <div
-              key={r.id}
-              className="evidence"
-              onClick={() => setExpanded(r.id)}
-              style={{
-                cursor: "pointer",
-                borderColor: expanded === r.id ? "#69a99e" : undefined,
-              }}
-            >
-              <div className="split">
-                <span className="evidence-id">
-                  {r.id} · {c.name}
-                </span>
-                {badge(status)}
-              </div>
-              <strong>{r.action}</strong>
-              <div className="subtle">
-                {r.priority} · {r.channel} · {r.confidence} confidence
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <RecommendationDetail
-        key={expanded}
-        rec={recommendations.find((r) => r.id === expanded)!}
-        notify={notify}
-      />
-    </div>
-  );
-}
-function RecommendationDetail({
-  rec: r,
-  notify,
-}: {
-  rec: (typeof recommendations)[number];
-  notify: (s: string) => void;
-}) {
-  const c = customers.find((x) => x.id === r.customerId)!;
-  const workflow = useWorkflow(),
-    status = workflow.recommendationStatuses[r.id] ?? r.status;
-  const [draft, setDraft] = useState(
-      c.scenario === "A"
-        ? "Hi Maya, I’m sorry our promised update was missed. I’m reviewing the replacement status under our service policy and will confirm the next step after manager approval."
-        : "Hi Ethan, based on your question about campaign performance, I can share the approved Analytics Suite overview if helpful.",
-    ),
-    [feedback, setFeedback] = useState("");
-  const submit = () => {
-    workflow.setRecommendation(r.id, "Pending Approval");
-    notify(
-      "Original AVO output and edited draft saved; submitted for manager approval",
-    );
-  };
-  const rate = (value: string) => {
-    if (value === "Incorrect") {
-      const note = window.prompt("Correction note (required)");
-      if (!note?.trim())
-        return notify(
-          "Incorrect feedback was not saved because a correction note is required",
-        );
-      workflow.log("Recommendation feedback", r.id, `Incorrect: ${note}`);
-    } else workflow.log("Recommendation feedback", r.id, value);
-    setFeedback(value);
-    notify(`Recommendation marked ${value}`);
-  };
-  return (
-    <div className="card">
-      <div className="card-head">
-        <h2>AVO Recommendation</h2>
-        {badge(r.confidence)}
-      </div>
-      <div className="notice warning">
-        AVO-generated recommendation. Verify evidence before approval.
-      </div>
-      <h3 style={{ marginTop: 16 }}>{r.action}</h3>
-      <p className="subtle" style={{ lineHeight: 1.6 }}>
-        {r.explanation}
-      </p>
-      <div className="grid two">
-        <div className="field">
-          <label>Owner</label>
-          <input className="input" defaultValue={r.owner} />
-        </div>
-        <div className="field">
-          <label>Deadline</label>
-          <input className="input" defaultValue={r.deadline} />
-        </div>
-      </div>
-      <div className="field" style={{ marginTop: 12 }}>
-        <label>Editable customer draft</label>
-        <textarea
-          className="input"
-          rows={5}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-        />
-      </div>
-      <h3 style={{ marginTop: 16 }}>Evidence and policy sources</h3>
-      {c.messages
-        .filter((m) => m.evidence)
-        .slice(0, 3)
-        .map((m) => (
-          <div className="evidence" key={m.id}>
-            <span className="evidence-id">{m.id} · Source evidence</span>
-            <div>{m.text}</div>
-          </div>
-        ))}
-      <div className="evidence">
-        <span className="evidence-id">
-          customer-service-policy.pdf · page 1
-        </span>
-        <div>
-          Service recovery must precede promotional outreach for unresolved
-          complaints.
-        </div>
-      </div>
-      <div className="notice">
-        Uncertainty: the customer’s future behaviour cannot be confirmed. Staff
-        must validate current delivery status.
-      </div>
-      <div className="top-actions" style={{ marginTop: 13 }}>
-        <button
-          className="btn btn-primary"
-          disabled={!draft.trim() || status === "Pending Approval"}
-          onClick={submit}
-        >
-          {status === "Pending Approval" ? "Submitted" : "Submit for approval"}
-        </button>
-        <button className="btn btn-outline" onClick={() => rate("Useful")}>
-          Useful
-        </button>
-        <button
-          className="btn btn-outline"
-          onClick={() => rate("Partially useful")}
-        >
-          Partially useful
-        </button>
-        <button className="btn btn-outline" onClick={() => rate("Not useful")}>
-          Not useful
-        </button>
-        <button className="btn btn-outline" onClick={() => rate("Incorrect")}>
-          Incorrect
-        </button>
-      </div>
-      {feedback && <p className="subtle">Feedback recorded: {feedback}</p>}
-    </div>
-  );
-}
-
-function Actions({
-  notify,
-  role,
-}: {
-  notify: (s: string) => void;
-  role: Role;
-}) {
-  const workflow = useWorkflow();
-  const c = customers[0],
-    status = workflow.actionStatus,
-    manager = role === "Sales Manager" || role === "Administrator",
-    approved = status === "Approved" || status === "Executed";
-  const [message, setMessage] = useState(
-      "Hi Maya, I’m sorry our promised update was missed. I’m reviewing the replacement under our approved service policy and will confirm the next step.",
-    ),
-    [comment, setComment] = useState("");
-  const decide = (next: string) => {
-    if (!manager) return notify("Sales Manager or Administrator role required");
-    if (!comment.trim()) return notify("A reviewer comment is required");
-    if (next === "Rejected") {
-      const reason = window.prompt("Rejection reason (required)");
-      if (!reason?.trim())
-        return notify("Rejection cancelled because a reason is required");
-      workflow.log("Approval rejection reason", "ACT-021", reason);
-    }
-    workflow.setAction(next);
-    notify(`Action ${next.toLowerCase()} and audit event recorded`);
-  };
-  const execute = (channel: string) => {
-    if (!approved) return notify("Approval is required before execution");
-    if (!canOutreach(c, channel))
-      return notify(`Consent guardrail blocked ${channel} outreach`);
-    workflow.setAction("Executed");
-    notify(`Approved ${channel} action opened; no message was auto-sent`);
-  };
-  return (
-    <div className="grid two">
-      <div className="card">
-        <div className="card-head">
-          <h2>ACT-021 · Service recovery</h2>
-          {badge(status)}
-        </div>
-        <div className="customer">
-          <div className="customer-dot">MT</div>
-          <div>
-            <strong>{c.name}</strong>
-            <div className="subtle">{c.company} · consent verified</div>
-          </div>
-        </div>
-        <div className="divider" />
-        <div className="timeline">
-          {[
-            ["Draft created", "Aisha Rahman · original AVO output retained"],
-            ["Submitted for approval", "Aisha Rahman · human edit retained"],
-            [
-              status === "Rejected"
-                ? "Rejected"
-                : status === "Changes Requested"
-                  ? "Changes requested"
-                  : approved
-                    ? "Approved"
-                    : "Awaiting Sales Manager",
-              approved
-                ? "Farah Chen · reviewer comment recorded"
-                : "Decision pending",
-            ],
-            [
-              status === "Executed" ? "Outreach opened" : "Execution pending",
-              status === "Executed"
-                ? "Executor and timestamp audited"
-                : "Requires approval",
-            ],
-          ].map(([a, b], i) => (
-            <div className="timeline-item" key={String(a)}>
-              <span
-                className="timeline-dot"
-                style={{
-                  borderColor: i < 2 || approved ? "#19766e" : "#c8ceca",
-                }}
-              />
-              <strong>{a}</strong>
-              <div className="subtle">{b}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="card">
-        <div className="card-head">
-          <h2>Approval review</h2>
-          <span className="badge strategic">Sales Manager</span>
-        </div>
-        <div className="notice warning">
-          AVO cannot approve its own recommendation. Original and human-edited
-          versions are retained.
-        </div>
-        <div className="field" style={{ marginTop: 14 }}>
-          <label>Customer message draft</label>
-          <textarea
-            className="input"
-            rows={5}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-          />
-        </div>
-        <div className="field" style={{ marginTop: 10 }}>
-          <label>Reviewer comment (required)</label>
-          <input
-            className="input"
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="Record the basis for the decision"
-          />
-        </div>
-        {!approved ? (
-          <div className="top-actions" style={{ marginTop: 12 }}>
-            <button
-              className="btn btn-primary"
-              disabled={!manager || !message.trim()}
-              onClick={() => decide("Approved")}
-            >
-              Approve
-            </button>
-            <button
-              className="btn btn-danger"
-              disabled={!manager}
-              onClick={() => decide("Rejected")}
-            >
-              Reject
-            </button>
-            <button
-              className="btn btn-outline"
-              disabled={!manager}
-              onClick={() => decide("Changes Requested")}
-            >
-              Request changes
-            </button>
-          </div>
-        ) : (
-          <div className="top-actions" style={{ marginTop: 12 }}>
-            <a
-              className="btn btn-primary"
-              href={whatsappLink(c.phone, message)}
-              target="_blank"
-              rel="noreferrer"
-              onClick={() => execute("WhatsApp")}
-            >
-              <MessageCircle size={14} /> Open approved WhatsApp
-            </a>
-            <a
-              className="btn btn-outline"
-              href={`mailto:${c.email}?subject=${encodeURIComponent("Service recovery follow-up")}&body=${encodeURIComponent(message)}`}
-              onClick={() => execute("Email")}
-            >
-              <Mail size={14} /> Compose email
-            </a>
-            <button
-              className="btn btn-outline"
-              onClick={() => {
-                workflow.log(
-                  "Internal follow-up task created",
-                  "TASK-021",
-                  "Open",
-                );
-                notify("Internal follow-up task created");
-              }}
-            >
-              Create internal task
-            </button>
-            <Link
-              className="btn btn-outline"
-              href="/r/demo-recovery-cus1001"
-              onClick={() =>
-                workflow.log("Trackable link opened", "LINK-021", "Click")
-              }
-            >
-              Trackable recovery page
-            </Link>
-          </div>
-        )}
-        {!manager && !approved && (
-          <p className="subtle">
-            This demo account has read-only access to approval controls.
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Marketing({ go }: { go: (p: string) => void }) {
-  const detection = detectSegmentDecline(4, 12, 18, 24, 29),
-    affected = customers.filter((c) => c.region === "North").slice(0, 6);
-  return (
-    <>
-      <div className="grid stats">
-        {[
-          ["Active triggers", "3"],
-          ["Customers affected", "12"],
-          ["Revenue decline", "18%"],
-          ["Shared themes", "3"],
-        ].map(([a, b]) => (
-          <div className="card" key={a}>
-            <div className="subtle">{a}</div>
-            <div className="stat-value">{b}</div>
-            <span className="demo-label">Synthetic metric</span>
-          </div>
-        ))}
-      </div>
-      <div className="card">
-        <div className="card-head">
-          <div>
-            <h2>MKT-003 · North food & beverage decline</h2>
-            <div className="subtle">System-detected · 18 July 2026</div>
-          </div>
-          <span className="badge high">Intervention recommended</span>
-        </div>
-        <div className="grid three">
-          <div className="evidence">
-            <span className="evidence-id">DETERMINISTIC CALCULATION</span>
-            <strong style={{ display: "block", fontSize: 20 }}>
-              {detection.affectedPercentage}%
-            </strong>
-            <span className="subtle">
-              4 of 12 at High/Critical risk · threshold 20%
-            </span>
-          </div>
-          <div className="evidence">
-            <span className="evidence-id">TRANSACTION EVIDENCE</span>
-            <strong style={{ display: "block", fontSize: 20 }}>-18%</strong>
-            <span className="subtle">
-              Segment revenue vs prior period · threshold -15%
-            </span>
-          </div>
-          <div className="evidence">
-            <span className="evidence-id">ENGAGEMENT EVIDENCE</span>
-            <strong style={{ display: "block", fontSize: 20 }}>-29%</strong>
-            <span className="subtle">
-              Reply and campaign engagement · threshold -25%
-            </span>
-          </div>
-        </div>
-        <div className="grid two" style={{ marginTop: 14 }}>
-          <div>
-            <h3>Common evidence and themes</h3>
-            {[
-              "Package price difficult to justify — 5 customers",
-              "Purchase frequency down 24%",
-              "Lower engagement across email campaigns",
-            ].map((x, i) => (
-              <div className="evidence" key={x}>
-                <span className="evidence-id">
-                  {i
-                    ? "Transaction aggregate"
-                    : "Conversation sources · 5 valid message IDs"}
-                </span>
-                <div>{x}</div>
-              </div>
-            ))}
-            <h3>Affected customers</h3>
-            {affected.map((c) => (
-              <div className="split evidence" key={c.id}>
-                <span>
-                  {c.id} · {c.name}
-                </span>
-                {badge(c.risk)}
-              </div>
-            ))}
-          </div>
-          <div>
-            <h3>AVO campaign recommendation</h3>
-            <div className="notice">
-              Create a value-education campaign grounded in the approved product
-              catalogue and marketing guidelines. Do not invent a discount or
-              imply guaranteed savings.
-            </div>
-            <p className="subtle">
-              Confidence: Medium · Pricing sensitivity is observed, but causal
-              attribution remains uncertain.
-            </p>
-            <button
-              className="btn btn-primary"
-              onClick={() => go("campaign-studio")}
-            >
-              <Sparkles size={14} /> Create campaign with AVO
-            </button>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
-function CampaignStudio({
-  notify,
-  role,
-}: {
-  notify: (s: string) => void;
-  role: Role;
-}) {
-  const workflow = useWorkflow(),
-    status = workflow.campaignStatus;
-  const [stage, setStage] = useState(1),
-    [generated, setGenerated] = useState(false),
-    [comment, setComment] = useState(""),
-    [sources, setSources] = useState([true, true, true]);
-  const manager = role === "Marketing Manager" || role === "Administrator",
-    approved = status === "Approved" || status === "Scheduled";
-  const schedule = async () => {
-    if (!approved)
-      return notify("Marketing Manager approval is required before scheduling");
-    const r = await fetch("/api/publish", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        campaignId: "CAM-003",
-        channelId: "demo-linkedin",
-        text: "Make every order work harder with clearer inventory insight. Explore the approved Inventory Optimizer guide.",
-        dueAt: "2026-07-24T02:00:00.000Z",
-        approved: true,
-        idempotencyKey: "CAM-003-demo-linkedin-20260724",
-      }),
-    });
-    const d = await r.json();
-    if (!r.ok || d.error) return notify(d.error || "Scheduling failed");
-    workflow.setCampaign("Scheduled");
-    notify(
-      d.simulated
-        ? "Scheduled with Demo Publisher — simulated, not sent"
-        : "Campaign scheduled through Buffer",
-    );
-  };
-  const submit = () => {
-    if (!generated || !sources.some(Boolean))
-      return notify(
-        "Generate content and select at least one approved source first",
-      );
-    workflow.setCampaign("Pending Approval");
-    setStage(4);
-    notify(
-      "Campaign submitted; original AVO output and current version preserved",
-    );
-  };
-  const approve = () => {
-    if (!manager)
-      return notify("Marketing Manager or Administrator role required");
-    if (status !== "Pending Approval")
-      return notify("Campaign must be submitted before approval");
-    if (!comment.trim()) return notify("Reviewer comment is required");
-    workflow.setCampaign("Approved");
-    setStage(5);
-    notify("Marketing Manager approved campaign and factual review");
-  };
-  return (
-    <div className="grid two">
-      <div className="card">
-        <div className="card-head">
-          <h2>CAM-003 · Value clarity</h2>
-          {badge(status)}
-        </div>
-        <div className="tabs">
-          {["1 Brief", "2 Content", "3 Review", "4 Approval", "5 Schedule"].map(
-            (x, i) => (
-              <button
-                key={x}
-                className={`tab ${stage === i + 1 ? "active" : ""}`}
-                onClick={() => setStage(i + 1)}
-              >
-                {x}
-              </button>
-            ),
-          )}
-        </div>
-        <div className="field">
-          <label>Objective</label>
-          <input
-            className="input"
-            defaultValue="Re-engage North food & beverage customers with approved product value education"
-          />
-        </div>
-        <div className="field" style={{ marginTop: 10 }}>
-          <label>Consented audience</label>
-          <input
-            className="input"
-            defaultValue="8 of 12 customers · 4 excluded by consent guardrail"
-            readOnly
-          />
-        </div>
-        <h3 style={{ marginTop: 16 }}>Approved source materials</h3>
-        {[
-          "product-catalogue.pdf · page 1",
-          "marketing-guidelines.pdf · page 1",
-          "MKT-003 aggregate evidence",
-        ].map((x, i) => (
-          <label className="evidence" key={x} style={{ display: "block" }}>
-            <input
-              type="checkbox"
-              checked={sources[i]}
-              onChange={(e) =>
-                setSources((s) =>
-                  s.map((v, j) => (j === i ? e.target.checked : v)),
-                )
-              }
-            />{" "}
-            {x}
-          </label>
-        ))}
-        <div className="notice">
-          Consent guardrail excluded 4 customers before audience selection.
-        </div>
-        <button
-          className="btn btn-primary"
-          onClick={() => {
-            if (!sources.some(Boolean))
-              return notify("Select an approved source");
-            setGenerated(true);
-            setStage(2);
-            workflow.log(
-              "AVO campaign content generated",
-              "CAM-003",
-              "AVO Demo Analysis",
-            );
-            notify("AVO Demo Analysis generated grounded campaign variants");
-          }}
-        >
-          <Bot size={14} /> Generate with AVO
-        </button>
-        <div className="evidence" style={{ marginTop: 12 }}>
-          <span className="evidence-id">CAMPAIGN VISUAL</span>
-          <div>
-            existing-campaign.png · 1200×628 · synthetic asset · crop
-            suggestion: centred safe area
-          </div>
-          <a
-            className="btn btn-outline"
-            href="/api/demo-files/existing-campaign.png"
-            target="_blank"
-          >
-            Preview visual
-          </a>
-        </div>
-      </div>
-      <div className="card">
-        <div className="card-head">
-          <h2>Channel content</h2>
-          {generated && <span className="demo-label">AVO Demo Analysis</span>}
-        </div>
-        <div className="notice warning">
-          Factual review: no discount, unverified price, inventory guarantee or
-          outcome claim is present.
-        </div>
-        {[
-          [
-            "LinkedIn caption",
-            "Make every order work harder with clearer inventory insight. Explore the approved Inventory Optimizer guide.",
-          ],
-          [
-            "Instagram caption",
-            "Plan with a clearer view. Explore the Inventory Optimizer overview and ask our team whether it fits your workflow. #InventoryPlanning #CustomerSuccess",
-          ],
-          [
-            "Facebook caption",
-            "Looking for a clearer view of inventory movement? Read the approved Inventory Optimizer overview and speak with our team about fit.",
-          ],
-          ["Email subject", "A clearer view of your inventory planning"],
-          [
-            "Email message",
-            "Explore the approved Inventory Optimizer overview. Reply if you would like a staff-led walkthrough.",
-          ],
-          [
-            "WhatsApp campaign message",
-            "See the approved Inventory Optimizer overview. Reply if you would like a staff-led walkthrough.",
-          ],
-          ["Hashtags", "#InventoryPlanning #CustomerSuccess #FoodOperations"],
-          ["Call to action", "Review the approved product overview"],
-          [
-            "Landing-page text",
-            "Understand the documented planning views and decide with your team whether the product fits.",
-          ],
-        ].map(([label, value]) => (
-          <div className="field" style={{ marginTop: 10 }} key={label}>
-            <label>{label}</label>
-            {value.length > 80 ? (
-              <textarea className="input" rows={3} defaultValue={value} />
-            ) : (
-              <input className="input" defaultValue={value} />
-            )}
-          </div>
-        ))}
-        <div className="evidence">
-          <span className="evidence-id">CLAIM SOURCE</span>
-          <div>
-            product-catalogue.pdf · page 1 · Inventory Optimizer description
-          </div>
-        </div>
-        <div className="field">
-          <label>Reviewer comment (required for approval)</label>
-          <input
-            className="input"
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="Record factual and audience review"
-          />
-        </div>
-        <div className="top-actions" style={{ marginTop: 12 }}>
-          {status === "Draft" && (
-            <button
-              className="btn btn-primary"
-              disabled={!generated}
-              onClick={submit}
-            >
-              Submit for approval
-            </button>
-          )}
-          {status === "Pending Approval" && (
-            <>
-              <button
-                className="btn btn-primary"
-                disabled={!manager}
-                onClick={approve}
-              >
-                Approve as manager
-              </button>
-              <button
-                className="btn btn-danger"
-                disabled={!manager}
-                onClick={() => {
-                  if (!comment.trim())
-                    return notify("Reviewer comment is required");
-                  workflow.setCampaign("Rejected");
-                  notify("Campaign rejected and audited");
-                }}
-              >
-                Reject
-              </button>
-            </>
-          )}
-          {approved && (
-            <button
-              className="btn btn-primary"
-              onClick={schedule}
-              disabled={status === "Scheduled"}
-            >
-              <CalendarDays size={14} />
-              {status === "Scheduled"
-                ? "Scheduled (simulated)"
-                : "Schedule approved campaign"}
-            </button>
-          )}
-        </div>
-        {!manager && status === "Pending Approval" && (
-          <p className="subtle">This account cannot approve campaigns.</p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Calendar() {
-  const workflow = useWorkflow();
-  return (
-    <div className="grid three">
-      {[
-        [
-          "24 Jul",
-          "Value clarity",
-          "LinkedIn · 10:00",
-          workflow.campaignStatus,
-        ],
-        ["26 Jul", "Product planning guide", "Instagram · 12:30", "Approved"],
-        ["30 Jul", "Recovery stories", "Facebook · 09:00", "Draft"],
-      ].map(([d, n, t, s]) => (
-        <div className="card" key={n}>
-          <div className="eyebrow">{d} · 2026</div>
-          <h2 style={{ margin: "9px 0" }}>{n}</h2>
-          <div className="subtle">{t}</div>
-          <div className="divider" />
-          {badge(s)}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function Analytics() {
-  return (
-    <>
-      <div className="grid stats">
-        {[
-          ["Recovered customers", "6", "+2 this quarter"],
-          ["Estimated recovered revenue", money(128400), "Synthetic estimate"],
-          ["Actions completed", "18", "78% approval rate"],
-          ["Campaign conversions", "7", "Demo outcomes"],
-        ].map(([a, b, c]) => (
-          <div className="card" key={a}>
-            <div className="subtle">{a}</div>
-            <div className="stat-value">{b}</div>
-            <div className="trend">{c}</div>
-          </div>
-        ))}
-      </div>
-      <div className="grid two">
-        <div className="card">
-          <div className="card-head">
-            <h2>Customers by tier</h2>
-            <span className="demo-label">Synthetic</span>
-          </div>
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={tiersChart}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} />
-              <Tooltip />
-              <Bar dataKey="value" fill="#19766e" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="card">
-          <div className="card-head">
-            <h2>Customers by risk</h2>
-            <span className="demo-label">Synthetic</span>
-          </div>
-          <ResponsiveContainer width="100%" height={240}>
-            <PieChart>
-              <Pie
-                data={riskChart}
-                dataKey="value"
-                nameKey="name"
-                innerRadius={55}
-                outerRadius={85}
-                paddingAngle={3}
-              >
-                {["#58a884", "#dec453", "#e89b45", "#dd684d"].map((x) => (
-                  <Cell key={x} fill={x} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-      <div className="grid two" style={{ marginTop: 14 }}>
-        <div className="card">
-          <h2>Successful recovery · Omar Aziz</h2>
-          <div className="divider" />
-          <div className="timeline">
-            <div className="timeline-item">
-              <span className="timeline-dot" />
-              <strong>High risk · 68</strong>
-              <div className="subtle">Unresolved replacement issue</div>
-            </div>
-            <div className="timeline-item">
-              <span className="timeline-dot" />
-              <strong>Approved service recovery</strong>
-              <div className="subtle">Human-reviewed WhatsApp action</div>
-            </div>
-            <div className="timeline-item">
-              <span className="timeline-dot" />
-              <strong>Positive response and new purchase</strong>
-              <div className="subtle">Risk recalculated to Medium · 42</div>
-            </div>
-          </div>
-          <div className="notice">
-            Estimated recovered revenue: {money(22100)} · based on observed
-            subsequent purchase, labelled estimate.
-          </div>
-        </div>
-        <div className="card">
-          <h2>AVO governance</h2>
-          <div className="divider" />
-          {[
-            ["Generated", 42],
-            ["Approved unchanged", 19],
-            ["Edited before approval", 13],
-            ["Rejected", 6],
-            ["Marked incorrect", 1],
-            ["Low confidence / abstained", 4],
-          ].map(([a, b]) => (
-            <div className="split evidence" key={String(a)}>
-              <span>{a}</span>
-              <strong>{b}</strong>
-            </div>
-          ))}
-        </div>
-      </div>
-    </>
   );
 }
 

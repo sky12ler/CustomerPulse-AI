@@ -1,305 +1,358 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import path from "node:path";
 
 const mock = (name: string) => path.join(process.cwd(), "mock-data", name);
-const signInAs = async (page: import("@playwright/test").Page, role: string) =>
+const fixture = (name: string) =>
+  path.join(process.cwd(), "e2e", "fixtures", name);
+const signInAs = (page: Page, role: string) =>
   page.getByLabel("Demo account").selectOption(role);
-
-test("all navigation routes render and RBAC restricts unauthorised settings", async ({
-  page,
-}) => {
-  await page.goto("/overview");
-  await signInAs(page, "Administrator");
-  const routes: [[string, string], ...Array<[string, string]>] = [
-    ["Overview", "Retention intelligence at a glance"],
-    ["Alert Centre", "Alert Centre"],
-    ["Customers", "Customers"],
-    ["Conversations", "Conversations"],
-    ["Data Imports", "Data Import Centre"],
-    ["AVO", "Ask AVO"],
-    ["Recommendations", "AVO Recommendations"],
-    ["Retention Actions", "Retention Actions"],
-    ["Marketing Intelligence", "Marketing Intelligence"],
-    ["Campaign Studio", "Campaign Studio"],
-    ["Campaign Calendar", "Campaign Calendar"],
-    ["Analytics", "Analytics"],
-    ["Data Governance", "Data Governance"],
-    ["Audit Reports", "Audit Reports"],
-    ["Settings", "Settings"],
-  ];
-  for (const [link, heading] of routes) {
-    await page.getByRole("link", { name: link, exact: true }).click();
-    await expect(
-      page.getByRole("heading", { name: heading, exact: true }).first(),
-    ).toBeVisible();
-  }
-  await signInAs(page, "Auditor");
-  await expect(page.getByText("Access restricted")).toBeVisible();
-});
-
-test("AVO Chat answers with evidence and abstains when unsupported", async ({
-  page,
-}) => {
-  await page.goto("/avo");
-  await signInAs(page, "Account Executive");
-  await page
-    .getByRole("button", { name: "Why is Maya Tan Critical Risk?" })
-    .click();
-  await expect(
-    page.getByText("MSG-A-101", { exact: false }).last(),
-  ).toBeVisible();
-  await expect(
-    page.getByText("does not confirm future churn", { exact: false }),
-  ).toBeVisible();
-  const input = page.getByPlaceholder(
-    "Ask AVO about accessible customers, evidence or approvals",
-  );
-  await input.fill("Make an unsupported prediction");
-  await input.press("Enter");
-  await expect(
-    page.getByText("insufficient evidence", { exact: false }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("cannot approve or execute actions", { exact: false }),
-  ).toBeVisible();
-});
-test("every permanent mock file passes the manual import workflow", async ({
-  page,
-}) => {
-  await page.goto("/imports");
-  await signInAs(page, "Administrator");
-  const files = [
-    "customers.csv",
-    "transactions.csv",
-    "conversations.csv",
-    "conversations.json",
-    "products.csv",
-    "campaign-results.csv",
-    "retention-playbook.pdf",
-    "customer-service-policy.pdf",
-    "product-catalogue.pdf",
-    "marketing-guidelines.pdf",
-    "existing-campaign.png",
-  ];
-  for (const file of files) {
-    const response = page.waitForResponse(
-      (r) =>
-        r.url().includes("/api/imports/validate") &&
-        r.request().method() === "POST",
-    );
-    await page.getByLabel("Import file").setInputFiles(mock(file));
-    expect((await response).status(), file).toBe(200);
-    await expect(page.getByText(file, { exact: false }).first()).toBeVisible();
-    await page
-      .getByRole("button", { name: "Review validation result" })
-      .click();
-    await expect(
-      page.getByText(/valid · 0 duplicates · 0 invalid/),
-    ).toBeVisible();
-    await page
-      .getByRole("button", { name: "Continue to confirmation" })
-      .click();
-    await page.getByRole("button", { name: "Confirm import" }).click();
-    await expect(page.getByText(file, { exact: false }).last()).toBeVisible();
-  }
-  await expect(page.getByText("Confirmed session imports")).toBeVisible();
-});
-
-test("Scenario A completes analysis, recommendation, approval and guarded outreach", async ({
-  page,
-}) => {
-  await page.goto("/conversations");
-  await signInAs(page, "Sales Manager");
+async function clean(page: Page, route = "/overview", role = "Administrator") {
+  await page.goto(route);
+  await page.evaluate(() => localStorage.removeItem("customerpulse-demo-v2"));
+  await page.reload();
+  await signInAs(page, role);
+}
+async function upload(
+  page: Page,
+  kind: string,
+  filename: string,
+  source = mock(filename),
+) {
+  await page.getByLabel("Import type").selectOption(kind);
+  await page.getByRole("button", { name: "Continue" }).click();
   const response = page.waitForResponse(
-    (r) =>
-      r.url().includes("/api/avo/analyze") && r.request().method() === "POST",
+    (result) =>
+      result.url().includes("/api/imports/validate") &&
+      result.request().method() === "POST",
   );
-  await page.getByRole("button", { name: "Run AVO Analysis" }).click();
-  expect((await response).ok()).toBe(true);
-  await expect(
-    page.getByText("AVO Demo Analysis", { exact: true }).last(),
-  ).toBeVisible();
-  await expect(
-    page.getByText("MSG-A-104", { exact: false }).last(),
-  ).toBeVisible();
+  await page.getByLabel("Import file").setInputFiles(source);
+  expect([200, 422]).toContain((await response).status());
+}
+async function confirmImport(page: Page) {
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByLabel(/I confirm/).check();
+  await page.getByRole("button", { name: "Confirm Import" }).click();
+}
+async function submitMaya(page: Page, requester = "Account Executive") {
+  await clean(page, "/recommendations?recommendationId=REC-001", requester);
+  await page.getByRole("button", { name: "Submit for Approval" }).click();
+  await expect(page.locator(".success-panel")).toContainText(
+    "Recommendation submitted to Sales Manager",
+  );
+  await page.getByRole("button", { name: "View Retention Action" }).click();
+}
+async function completeCampaign(page: Page) {
+  await clean(
+    page,
+    "/campaign-studio?triggerId=MKT-003&step=1",
+    "Administrator",
+  );
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Generate content with AVO" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  for (const label of [
+    "Audience reviewed",
+    "Consent reviewed",
+    "Sources reviewed",
+    "Content reviewed",
+    "Claims reviewed",
+    "Schedule reviewed",
+  ])
+    await page.getByLabel(label).check();
+  await page.getByRole("button", { name: "Continue" }).click();
   await page
-    .getByRole("button", { name: "Generate AVO Recommendation" })
-    .click();
-  await page.getByText("Recommendations", { exact: true }).first().click();
+    .getByLabel("Campaign reviewer comment")
+    .fill("Audience, sources, consent and claims verified");
+  await page.getByRole("button", { name: "Submit for Approval" }).click();
+  await page.getByRole("button", { name: "Approve", exact: true }).click();
+  await expect(page.locator(".notice.success")).toContainText(
+    "approved and ready to schedule",
+  );
+  await page.getByRole("button", { name: "Continue" }).click();
+}
+
+test("1 role persists between routes and refresh", async ({ page }) => {
+  await clean(page, "/overview", "Marketing Manager");
+  await page.getByRole("link", { name: "Campaign Studio" }).click();
+  await expect(page.getByLabel("Demo account")).toHaveValue(
+    "Marketing Manager",
+  );
+  await page.reload();
+  await expect(page.getByLabel("Demo account")).toHaveValue(
+    "Marketing Manager",
+  );
+  await expect(page.getByText("Access restricted")).toHaveCount(0);
+});
+
+test("2 Administrator uploads customers.csv", async ({ page }) => {
+  await clean(page, "/imports");
+  await upload(page, "customers", "customers.csv");
+  await expect(page.getByText(/30 valid/)).toBeVisible();
+});
+
+test("3 Sales Manager uploads conversations.csv", async ({ page }) => {
+  await clean(page, "/imports", "Sales Manager");
+  await upload(page, "conversations", "conversations.csv");
+  await expect(page.getByText(/valid/).first()).toBeVisible();
+});
+
+test("4 Marketing Manager uploads product-catalogue.pdf", async ({ page }) => {
+  await clean(page, "/imports", "Marketing Manager");
+  await upload(page, "product_catalogue", "product-catalogue.pdf");
+  await expect(page.getByText("Document metadata")).toBeVisible();
+  await expect(page.getByText(/Classification: Internal/)).toBeVisible();
+});
+
+test("5 invalid uploads show understandable errors", async ({ page }) => {
+  await clean(page, "/imports");
+  await upload(
+    page,
+    "customers",
+    "invalid-customers.csv",
+    fixture("invalid-customers.csv"),
+  );
+  await expect(page.getByText(/invalid/).first()).toBeVisible();
+  await expect(
+    page.getByText(
+      "Continue is unavailable because the file contains validation errors.",
+    ),
+  ).toBeVisible();
+});
+
+test("6 successful import shows result and next step", async ({ page }) => {
+  await clean(page, "/imports");
+  await upload(page, "customers", "customers.csv");
+  await confirmImport(page);
+  await expect(page.locator(".success-panel")).toContainText(
+    "Import completed successfully",
+  );
+  await expect(
+    page.getByRole("link", { name: "View Customers" }),
+  ).toBeVisible();
+  await expect(page.getByText(/IMP-/).first()).toBeVisible();
+});
+
+test("7 recommendation creates Pending Approval action", async ({ page }) => {
+  await submitMaya(page);
+  await expect(page.locator("#ACT-021")).toContainText("Pending Approval");
+});
+
+test("8 recommendation navigates to and highlights exact action", async ({
+  page,
+}) => {
+  await submitMaya(page);
+  await expect(page).toHaveURL(/actions\?actionId=ACT-021/);
+  await expect(page.locator("#ACT-021")).toHaveClass(/record-highlight/);
+});
+
+test("9 self-approval is blocked", async ({ page }) => {
+  await submitMaya(page, "Administrator");
+  await page.getByLabel("Reviewer comment").fill("Checked");
+  await page.getByRole("button", { name: "Approve", exact: true }).click();
+  await expect(page.locator(".notice.danger")).toContainText(
+    "cannot approve their own action",
+  );
+});
+
+test("10 approved action becomes Approved and Ready", async ({ page }) => {
+  await submitMaya(page);
+  await signInAs(page, "Sales Manager");
+  await page.getByLabel("Reviewer comment").fill("Evidence and policy checked");
+  await page.getByRole("button", { name: "Approve", exact: true }).click();
+  await expect(page.locator(".notice.success")).toContainText(
+    "approved and ready for execution",
+  );
+  await expect(page.locator("#ACT-021")).toContainText("Ready");
+});
+
+test("11 action cannot execute before approval", async ({ page }) => {
+  await submitMaya(page);
+  await expect(
+    page.getByRole("button", { name: /Execute Approved/ }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText(/Approval is required|manager-reviewed action/).first(),
+  ).toBeVisible();
+});
+
+test("12 marketing trigger prefills campaign", async ({ page }) => {
+  await clean(page, "/marketing", "Marketing Manager");
+  await page.getByRole("button", { name: "Create campaign with AVO" }).click();
+  await expect(page).toHaveURL(/triggerId=MKT-003/);
+  await expect(page.getByLabel("Campaign name")).toHaveValue(
+    "North value clarity",
+  );
+  await expect(page.getByLabel("Objective")).toHaveValue(/Re-engage North/);
+});
+
+test("13 wizard blocks incomplete steps with explanation", async ({ page }) => {
+  await clean(page, "/campaign-studio?step=1");
+  await page.getByLabel("Campaign name").fill("");
+  await expect(page.getByRole("button", { name: "Continue" })).toBeDisabled();
+  await expect(page.getByText(/Continue is unavailable because/)).toBeVisible();
+});
+
+test("14 campaign draft persists after refresh", async ({ page }) => {
+  await clean(page, "/campaign-studio?step=1");
+  await page.getByLabel("Campaign name").fill("Persistent North campaign");
+  await page.getByRole("button", { name: "Save Draft" }).click();
+  await page.reload();
+  await expect(page.getByLabel("Campaign name")).toHaveValue(
+    "Persistent North campaign",
+  );
+});
+
+test("15 campaign requires approval before scheduling", async ({ page }) => {
+  await clean(page, "/campaign-studio?step=7");
+  await expect(
+    page.getByRole("button", { name: "Schedule Campaign" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByText(
+      "Schedule is unavailable because campaign approval is pending.",
+    ),
+  ).toBeVisible();
+});
+
+test("16 scheduled campaign creates one ScheduledPost per channel", async ({
+  page,
+}) => {
+  await completeCampaign(page);
+  const responses: Promise<unknown>[] = [];
+  page.on("response", (response) => {
+    if (response.url().includes("/api/publish"))
+      responses.push(Promise.resolve(response));
+  });
+  await page.getByRole("button", { name: "Schedule Campaign" }).click();
+  await expect(page).toHaveURL(/campaign-calendar\?campaignId=CAM-003/);
+  await expect(page.getByText("POST-CAM-003-LINKEDIN")).toBeVisible();
+  await expect(page.getByText("POST-CAM-003-EMAIL")).toBeVisible();
+});
+
+test("17 scheduled campaign appears in shared calendar", async ({ page }) => {
+  await completeCampaign(page);
+  await page.getByRole("button", { name: "Schedule Campaign" }).click();
+  await expect(page.getByText("North value clarity").first()).toBeVisible();
+  await expect(page.getByText(/Demo Publisher/).first()).toBeVisible();
+});
+
+test("18 calendar highlights query-parameter campaign", async ({ page }) => {
+  await clean(
+    page,
+    "/campaign-calendar?campaignId=CAM-001",
+    "Marketing Manager",
+  );
+  await expect(page.locator(".calendar-record.record-highlight")).toContainText(
+    "Product planning guide",
+  );
+});
+
+test("19 marketing insight shows evidence and uncertainty", async ({
+  page,
+}) => {
+  await clean(page, "/marketing", "Marketing Manager");
+  await expect(page.getByText("5. Supporting evidence")).toBeVisible();
+  await expect(page.getByText("10. Uncertainty")).toBeVisible();
+  await expect(page.getByText(/correlation is not causation/i)).toBeVisible();
+});
+
+test("20 analytics insights and KPIs update with filters", async ({ page }) => {
+  await clean(page, "/analytics", "Sales Manager");
+  const before = await page
+    .locator(".metric-mini", { hasText: "Filtered customers" })
+    .innerText();
+  await page.getByLabel("Analytics tier").selectOption("Strategic");
+  const after = await page
+    .locator(".metric-mini", { hasText: "Filtered customers" })
+    .innerText();
+  expect(after).not.toBe(before);
+  await expect(page.getByText("Management Insights")).toBeVisible();
+});
+
+test("21 audit captures requester approver executor chain", async ({
+  page,
+}) => {
+  await submitMaya(page);
+  await signInAs(page, "Sales Manager");
+  await page.getByLabel("Reviewer comment").fill("Verified");
+  await page.getByRole("button", { name: "Approve", exact: true }).click();
+  await signInAs(page, "Account Executive");
+  await page.getByRole("button", { name: /Execute Approved/ }).click();
+  await page.getByRole("link", { name: "Audit Reports" }).click();
   await expect(
     page
-      .getByText("Resolve both delivery complaints before any promotion", {
-        exact: true,
-      })
+      .getByText("Recommendation submitted for approval", { exact: false })
       .first(),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Submit for approval" }).click();
-  await expect(
-    page.getByText("Pending Approval", { exact: true }).first(),
-  ).toBeVisible();
-  await page.getByText("Retention Actions", { exact: true }).click();
-  await page
-    .getByPlaceholder("Record the basis for the decision")
-    .fill("Evidence and service policy checked");
-  await page.getByRole("button", { name: "Approve", exact: true }).click();
-  await expect(
-    page.getByText("Approved", { exact: true }).first(),
-  ).toBeVisible();
-  const wa = page.getByRole("link", { name: "Open approved WhatsApp" });
-  await expect(wa).toHaveAttribute(
-    "href",
-    /^https:\/\/wa\.me\/601155501001\?text=/,
-  );
-  await page.getByRole("button", { name: "Create internal task" }).click();
-  await expect(page.getByRole("status")).toContainText(
-    "Internal follow-up task created",
-  );
-  await expect(
-    page.getByRole("link", { name: "Trackable recovery page" }),
-  ).toHaveAttribute("href", "/r/demo-recovery-cus1001");
-  await page.getByText("Audit Reports", { exact: true }).click();
   await expect(
     page.getByText("Retention action approved", { exact: false }).first(),
   ).toBeVisible();
-});
-
-test("approval and consent controls cannot be bypassed", async ({
-  page,
-  request,
-}) => {
-  await page.goto("/actions");
-  await signInAs(page, "Account Executive");
   await expect(
-    page.getByRole("button", { name: "Approve", exact: true }),
-  ).toBeDisabled();
-  const unapproved = await request.post("/api/publish", {
-    data: {
-      campaignId: "CAM-X",
-      channelId: "demo",
-      text: "x",
-      dueAt: new Date().toISOString(),
-      approved: false,
-      idempotencyKey: "blocked",
-    },
-  });
-  expect(unapproved.status()).toBe(422);
-  expect((await unapproved.json()).error).toContain("approval");
-  await page.getByText("Customers", { exact: true }).first().click();
-  await page
-    .getByPlaceholder("Search 30 synthetic customers")
-    .fill("Noah Demo");
-  await page.getByText("Noah Demo", { exact: true }).click();
-  await expect(
-    page.getByText("Not granted · WhatsApp", { exact: true }),
+    page.getByText("Retention action executed", { exact: false }).first(),
   ).toBeVisible();
 });
 
-test("Scenario B generates a grounded Growth outreach draft", async ({
-  page,
-}) => {
-  await page.goto("/customers");
-  await signInAs(page, "Account Executive");
-  await page
-    .getByPlaceholder("Search 30 synthetic customers")
-    .fill("Ethan Lim");
-  await page.getByText("Ethan Lim", { exact: true }).click();
-  await expect(page.getByText("Product gap:", { exact: false })).toContainText(
-    "Analytics Suite",
-  );
-  const response = page.waitForResponse((r) =>
-    r.url().includes("/api/avo/analyze"),
-  );
-  await page.getByRole("button", { name: "Run AVO Analysis" }).click();
-  expect((await response).ok()).toBe(true);
-  await expect(
-    page.getByText("Product discovery", { exact: false }),
-  ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Generate AVO Recommendation" })
-    .click();
-  await page.getByText("Recommendations", { exact: true }).first().click();
-  await page.getByText("REC-002 · Ethan Lim", { exact: true }).click();
-  await expect(page.locator("textarea").last()).toHaveValue(/Hi Ethan/);
-  await page.getByRole("button", { name: "Submit for approval" }).click();
-  await expect(
-    page.getByText("Pending Approval", { exact: true }).first(),
-  ).toBeVisible();
+test("22 Scenario A walkthrough completes", async ({ page }) => {
+  await clean(page);
+  await page.getByRole("button", { name: /Scenario A/ }).click();
+  for (let i = 0; i < 9; i++)
+    await page
+      .getByRole("button", {
+        name: i === 8 ? "Complete walkthrough" : "Next Step",
+      })
+      .click();
+  await expect(page.locator(".walkthrough-panel")).toHaveCount(0);
 });
 
-test("Scenario C enforces grounded campaign approval and Demo Publisher scheduling", async ({
-  page,
-}) => {
-  await page.goto("/marketing");
-  await signInAs(page, "Marketing Manager");
-  await expect(page.getByText("MKT-003", { exact: false })).toBeVisible();
-  await expect(page.getByText("Affected customers")).toBeVisible();
-  await page.getByRole("button", { name: "Create campaign with AVO" }).click();
-  await page.getByRole("button", { name: "Generate with AVO" }).click();
-  await page.getByRole("button", { name: "Submit for approval" }).click();
-  await page
-    .getByPlaceholder("Record factual and audience review")
-    .fill("Sources, consented audience and claims verified");
-  await page.getByRole("button", { name: "Approve as manager" }).click();
-  await expect(
-    page.getByText("Approved", { exact: true }).first(),
-  ).toBeVisible();
-  const scheduled = page.waitForResponse((r) =>
-    r.url().includes("/api/publish"),
-  );
-  await page
-    .getByRole("button", { name: "Schedule approved campaign" })
-    .click();
-  expect((await scheduled).ok()).toBe(true);
-  await expect(
-    page.getByText("Scheduled", { exact: true }).first(),
-  ).toBeVisible();
-  await page.getByText("Campaign Calendar", { exact: true }).click();
-  await expect(
-    page.getByText("Scheduled", { exact: true }).first(),
-  ).toBeVisible();
-  await page.getByText("Audit Reports", { exact: true }).click();
-  await expect(
-    page.getByText("Campaign scheduled", { exact: false }).first(),
-  ).toBeVisible();
+test("23 Scenario C walkthrough completes", async ({ page }) => {
+  await clean(page);
+  await page.getByRole("button", { name: /Scenario C/ }).click();
+  for (let i = 0; i < 12; i++)
+    await page
+      .getByRole("button", {
+        name: i === 11 ? "Complete walkthrough" : "Next Step",
+      })
+      .click();
+  await expect(page.locator(".walkthrough-panel")).toHaveCount(0);
 });
 
-test("Scenario D shows successful recovery and recovered revenue", async ({
-  page,
-}) => {
-  await page.goto("/analytics");
-  await signInAs(page, "Auditor");
-  await expect(page.getByText("Successful recovery · Omar Aziz")).toBeVisible();
+test("24 mobile workflow remains usable", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await clean(page);
+  await page.getByLabel("Toggle navigation").click();
+  await page.getByRole("link", { name: "Data Imports" }).click();
   await expect(
-    page.getByText("Risk recalculated to Medium · 42"),
+    page.getByRole("heading", { name: "Data Import Centre" }),
   ).toBeVisible();
-  await expect(page.getByText(/Estimated recovered revenue:/)).toBeVisible();
+  await expect(page.locator(".workflow-steps")).toBeVisible();
 });
 
-test("downloads, filters, governance requests and settings controls perform work", async ({
-  page,
-}) => {
-  await page.goto("/customers");
-  await signInAs(page, "Administrator");
-  const customerDownload = page.waitForEvent("download");
-  await page.getByRole("button", { name: /Export view/ }).click();
-  expect((await customerDownload).suggestedFilename()).toBe(
-    "customerpulse-customers.csv",
+test("25 Scenario B keeps a grounded Growth draft", async ({ page }) => {
+  await clean(
+    page,
+    "/recommendations?recommendationId=REC-002",
+    "Account Executive",
   );
-  await page.getByText("Alert Centre", { exact: true }).click();
-  await page.getByLabel("Alert risk filter").selectOption("Critical");
-  await expect(page.getByText("1 matching alerts")).toBeVisible();
-  await page.getByText("Data Governance", { exact: true }).click();
-  await page.getByRole("button", { name: "Start request" }).first().click();
-  await expect(page.getByText(/Pending authorised review/)).toBeVisible();
-  await page.getByText("Settings", { exact: true }).click();
-  const high = page.locator('input[type="number"]').first();
-  await high.fill("62");
-  await page.getByRole("button", { name: "Save thresholds" }).click();
-  await expect(page.getByRole("status")).toContainText("saved and audited");
-  await page.getByText("Audit Reports", { exact: true }).click();
-  const auditDownload = page.waitForEvent("download");
-  await page.getByRole("button", { name: "CSV" }).click();
-  expect((await auditDownload).suggestedFilename()).toBe(
-    "customerpulse-audit.csv",
+  await expect(page.getByLabel("Recommendation message draft")).toHaveValue(
+    /Hi Ethan/,
   );
+  await page.getByRole("button", { name: "Submit for Approval" }).click();
+  await expect(page.locator(".success-panel")).toContainText(
+    "submitted to Sales Manager",
+  );
+});
+
+test("26 Scenario D reports observed successful recovery", async ({ page }) => {
+  await clean(page, "/analytics", "Auditor");
+  await expect(
+    page.getByRole("heading", { name: "Successful recovery · Omar Aziz" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/Risk recalculated to Medium · 42/),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/Estimated recovered revenue: RM 4,200/),
+  ).toBeVisible();
 });

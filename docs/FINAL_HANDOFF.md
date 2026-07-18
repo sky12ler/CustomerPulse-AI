@@ -1,92 +1,81 @@
-# Final verification and handoff
+﻿# Final verification and handoff
 
 Verification date: 18 July 2026 (Asia/Kuala Lumpur).
 
-## Completed and exercised
+## Completed
 
-The production-browser suite exercises all 15 routes, demo roles/RBAC, all permanent mock imports, Scenarios A–D, AVO Demo Analysis, evidence-linked recommendations, manager approval, consent blocking, WhatsApp execution, grounded campaign approval, Demo Publisher scheduling, analytics, governance controls, settings and audit export. Unit coverage exercises tier/churn boundaries, import formats, AVO abstention and injection defense, live-provider request construction with an injected transport, approval/policy guardrails, audit events, publisher approval/idempotency, scenarios and required Supabase security structure.
+- Shared `localStorage` demo store persists the selected role, recommendations, retention actions, approvals, execution/outcomes, imports, campaign draft/versions, scheduled posts, audit events, and walkthrough progress across routes and refreshes. Reset Demo restores seeded records.
+- Role-aware navigation updates immediately. Unauthorized pages name the required role and provide a permitted destination. Import permissions are type-specific for Administrator, Sales Manager, Marketing Manager, assigned Account Executive, and Auditor.
+- Data Imports is a four-stage wizard with templates/examples, visible browse and drag/drop, progress, replace/remove, structured mapping/preview, document metadata/text/chunks, invalid-row detail, error export, confirmation, success/next steps, Import History, and auditing.
+- Recommendations create a linked Pending Approval Retention Action, preserve original and human-edited output, prevent duplicates, and navigate to `/actions?actionId=<id>` with selection/highlighting.
+- Retention Actions is an operational queue spanning Draft, Pending Approval, Changes Requested, Approved, In Progress, Waiting, Completed, Rejected, and overdue work. Approval, execution, and outcome are separate audited transitions. Reviewer comments, rejection reasons, self-approval, role, and consent are enforced.
+- Marketing Intelligence provides the requested evidence-based AVO insight, filters, affected customers, reasoned dismissal, uncertainty, avoid guidance, and a prefilled campaign handoff.
+- Campaign Studio is a persisted seven-step wizard: Brief, Audience, Sources, Content, Review, Approval, Schedule. It validates each step, keeps versions, requires six review confirmations and approval, calls the configured publisher once per channel, and creates shared ScheduledPost records.
+- Campaign Calendar uses those shared records, supports Month/Week/List, filters, query highlighting, details, reschedule/cancel/retry controls, links, and audit events.
+- Analytics includes filter-linked KPIs, management insights, and the Scenario D recovery evidence without causal claims.
+- Overview includes non-blocking, persisted Scenario A and C walkthroughs. Workflow guides and linked query routes connect both end-to-end chains on desktop and mobile.
 
-See `P0_ACCEPTANCE.md` for criterion-level evidence.
+## Root causes fixed
 
-## Verification commands
+Role reset came from page-local state initialized to Sales Manager for every full route load. The role now lives in the shared persisted store, and route guards/navigation read that single source.
 
-```bash
-npm run lint
-npm run typecheck
-npm test
-npm run test:e2e
-npm run build
-npm audit
-```
+The production upload endpoint returned an HTML 500 even for CSV because the import module eagerly initialized XLSX, DOCX, and PDF parser runtimes when the route loaded. Parsers now use format-specific dynamic imports. The client also verifies JSON response types and accepts structured 422 validation results so invalid rows are shown instead of a generic failure.
 
-`npm run test:e2e` builds and starts the production server itself. The final run passed 9/9 Chromium workflows. The unit suite passed 47/47 tests. The final standalone command results should be retained in the handoff message.
+Disconnected page-local recommendation/action/campaign/calendar arrays were replaced by shared domain records and audited transitions.
 
-## Required environment
+## Verification results
 
-No variable is required for demo mode. Optional live/deployment variables are:
+- `npm run lint`: passed, zero warnings/errors.
+- `npm run typecheck`: passed.
+- `npm test`: 47/47 passed, including all 11 permanent mock imports and PDF/DOCX/XLSX parsing.
+- `npm run test:e2e`: 26/26 Chromium tests passed against an optimized production server.
+- `npm run build`: passed.
+- `npm audit --audit-level=high`: zero vulnerabilities.
+- Secret scan: no credential or private-key match; one explicit `test-only-not-a-real-key` fixture is non-secret.
+
+Production results are recorded only after the pushed Vercel release is exercised; see the final handoff message and `P0_ACCEPTANCE.md`.
+
+## Environment variables
+
+None are required for the verified no-credential demo. Optional server-side variables:
 
 ```text
-OPENAI_API_KEY              server-only; enables live AVO
-OPENAI_MODEL                optional; defaults to gpt-5.6
-NEXT_PUBLIC_SUPABASE_URL    Supabase project URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY   server/reset only; never expose to browser
-BUFFER_API_KEY              server-only; enables BufferPublisher
-BUFFER_ORGANIZATION_ID      Buffer organization context
-NEXT_PUBLIC_APP_URL         public app origin
-ENABLE_IMAGE_GENERATION     optional P1 flag; false by default
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-5.6
+BUFFER_API_KEY=
+BUFFER_ORGANIZATION_ID=
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+NEXT_PUBLIC_APP_URL=
 ```
+
+Without keys, AVO uses the labelled deterministic Demo AVO provider and publishing uses the explicitly simulated Demo Publisher.
 
 ## Database deployment
 
-1. Create a Supabase project and install the Supabase CLI.
-2. Link it: `supabase link --project-ref <project-ref>`.
-3. Apply `supabase/migrations/202607180001_initial_schema.sql` with `supabase db push`.
-4. Set the Supabase variables locally in `.env.local` or the shell.
-5. For a disposable local project, `supabase db reset` applies the migration and `supabase/seed.sql`.
-6. For a configured project, run `node scripts/reset-demo.mjs --confirm`. This deliberately refuses to run without the flag and required credentials.
-7. Create private Storage buckets for imports, documents and campaign assets; use signed URLs.
-8. Create two test organizations and execute live cross-tenant RLS tests before production data is admitted.
+1. Create a Supabase project and install/link the CLI: `supabase link --project-ref <project-ref>`.
+2. Apply `supabase/migrations/202607180001_initial_schema.sql` with `supabase db push`.
+3. Set Supabase values in local/deployment secret storage; never expose the service-role key to the browser.
+4. For a disposable local project, `supabase db reset` applies the migration and `supabase/seed.sql`.
+5. For an explicitly configured project, run `node scripts/reset-demo.mjs --confirm`.
+6. Create private import/document/asset buckets and use signed URLs.
+7. Run live cross-tenant RLS tests with two organizations before admitting production data.
+
+The current UI runtime intentionally uses localStorage; the included Supabase schema/reset path is not claimed as connected UI persistence.
 
 ## Vercel deployment
 
-1. Import the repository into Vercel.
-2. Add only the variables needed for the selected mode; keep service-role/OpenAI/Buffer keys server-side.
-3. Deploy the Next.js project with the default build command `npm run build`.
-4. Verify `/api/health`, the Synthetic Demo Data label, role restrictions, import flow, approval/consent blocks, Demo/Buffer publisher label and audit export.
-5. If live integrations are enabled, run separate credentialed smoke tests and inspect provider/audit failures before announcing them.
+1. Import `sky12ler/CustomerPulse-AI` into Vercel and keep the existing production domain.
+2. Add only optional secrets needed for the selected mode.
+3. Deploy with `npm run build` (automatic Git deployment is supported).
+4. Confirm `/api/health` returns `release: workflow-v2`.
+5. Re-run role refresh, customers.csv, conversations.csv, product-catalogue.pdf, Scenario A, Scenario C scheduling/calendar, audit, analytics, and mobile checks on the production URL.
 
 ## Demo accounts
 
-Password for provisioned Supabase demo users: `PulseDemo!2026`.
+The no-credential UI uses the Switch Role control; no password is needed. Optional Supabase seed users use `PulseDemo!2026`: `admin@customerpulse.demo`, `sales.manager@customerpulse.demo`, `marketing.manager@customerpulse.demo`, `account.executive@customerpulse.demo`, and `auditor@customerpulse.demo`.
 
-| Email                                | Role              |
-| ------------------------------------ | ----------------- |
-| admin@customerpulse.demo             | Administrator     |
-| sales.manager@customerpulse.demo     | Sales Manager     |
-| marketing.manager@customerpulse.demo | Marketing Manager |
-| account.executive@customerpulse.demo | Account Executive |
-| auditor@customerpulse.demo           | Auditor / Viewer  |
+## Optional or unverified integrations
 
-The no-credential demo uses the visible Demo account selector and does not contact Supabase Auth.
-
-## Demo scenarios
-
-- A — Maya Tan: Strategic/Critical, decline, two delivery complaints, missed follow-up; service recovery, approval and WhatsApp.
-- B — Ethan Lim: Growth opportunity, positive intent and Analytics Suite gap; grounded outreach draft and approval submission.
-- C — North / Food & beverage: shared price objections and threshold breach; grounded campaign, Marketing Manager approval and simulated schedule.
-- D — Omar Aziz: prior High risk, approved recovery, positive reply and purchase; Medium risk and recovered revenue.
-
-## Optional/incomplete features
-
-P1 remains intentionally incomplete: Supabase Realtime, live Buffer publishing validation, automatic image crop/resize, AI image generation and advanced analytics. P2 is documentation-only: live WhatsApp/email ingestion, CRM integration, paid audiences, autonomous outreach and model training on real customer data.
-
-## Known limitations
-
-- There is no OpenAI key, so no external GPT-5.6 response was made. Demo mode is fully exercised; the live request/strict-schema/evidence validation contract is tested with an injected transport.
-- There are no Buffer credentials, so live channels/publishing/status/retry were not exercised. Demo Publisher is exercised and visibly simulated.
-- There is no Supabase project credential in this workspace. Migration/RLS/reset code is statically and unit checked, but remote migration, Auth provisioning, Storage and two-tenant isolation are not runtime verified.
-- Demo workflow state is in-memory and resets on reload; Supabase-backed UI persistence is a deployment integration task.
-- PDF export uses browser Print / Save as PDF; CSV export is native. Direct server-generated audit PDF is optional.
-- Campaign image generation/cropping/resizing is P1 and disabled.
-- No Vercel or GitHub deployment was performed because no authenticated target was supplied.
+Live OpenAI/GPT-5.6 responses, live Buffer publishing/status callbacks, remote Supabase Auth/UI persistence/Storage, real WhatsApp/email ingestion or sending, CRM synchronization, and image generation/advanced image processing remain optional and unverified because credentials were unavailable. The implemented adapters must not be described as live-verified.
