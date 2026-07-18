@@ -19,7 +19,7 @@ npm run build
 npm audit
 ```
 
-`npm run test:e2e` builds and starts the production server itself. The final run passed 8/8 Chromium workflows. The unit suite passed 47/47 tests. The final standalone command results should be retained in the handoff message.
+`npm run test:e2e` builds and starts the production server itself. The final run passed 9/9 Chromium workflows. The unit suite passed 47/47 tests. The final standalone command results should be retained in the handoff message.
 
 ## Required environment
 

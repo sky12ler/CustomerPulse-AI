@@ -67,7 +67,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-The verified suite contains 47 unit tests and 8 production-browser workflows covering all permanent imports, Scenarios A-D, approval and consent bypass attempts, RBAC, downloads and audit controls. See [Testing](docs/TESTING.md) and the [P0 acceptance matrix](docs/P0_ACCEPTANCE.md).
+The verified suite contains 47 unit tests and 9 production-browser workflows covering all permanent imports, Scenarios A-D, approval and consent bypass attempts, RBAC, downloads and audit controls. See [Testing](docs/TESTING.md) and the [P0 acceptance matrix](docs/P0_ACCEPTANCE.md).
 
 ## Privacy and AI governance
 

@@ -37,6 +37,32 @@ test("all navigation routes render and RBAC restricts unauthorised settings", as
   await expect(page.getByText("Access restricted")).toBeVisible();
 });
 
+test("AVO Chat answers with evidence and abstains when unsupported", async ({
+  page,
+}) => {
+  await page.goto("/avo");
+  await signInAs(page, "Account Executive");
+  await page
+    .getByRole("button", { name: "Why is Maya Tan Critical Risk?" })
+    .click();
+  await expect(
+    page.getByText("MSG-A-101", { exact: false }).last(),
+  ).toBeVisible();
+  await expect(
+    page.getByText("does not confirm future churn", { exact: false }),
+  ).toBeVisible();
+  const input = page.getByPlaceholder(
+    "Ask AVO about accessible customers, evidence or approvals",
+  );
+  await input.fill("Make an unsupported prediction");
+  await input.press("Enter");
+  await expect(
+    page.getByText("insufficient evidence", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("cannot approve or execute actions", { exact: false }),
+  ).toBeVisible();
+});
 test("every permanent mock file passes the manual import workflow", async ({
   page,
 }) => {
