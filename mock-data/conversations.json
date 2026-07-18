@@ -1,0 +1,7 @@
+{
+  "synthetic_demo_data": true,
+  "conversations": [
+    {"conversation_id":"CON-A","customer_external_id":"CUS-1001","channel":"WhatsApp","messages":[{"message_id":"MSG-A-101","sender_type":"customer","sender_name":"Maya Tan","message_text":"Our second delivery was late again and the replacement still has not arrived.","sent_at":"2026-06-30T09:15:00Z"},{"message_id":"MSG-A-102","sender_type":"staff","sender_name":"Aisha Rahman","message_text":"I will confirm the replacement status by Friday.","sent_at":"2026-07-01T10:05:00Z"}]},
+    {"conversation_id":"CON-B","customer_external_id":"CUS-1002","channel":"Email","messages":[{"message_id":"MSG-B-201","sender_type":"customer","sender_name":"Ethan Lim","message_text":"Do you have something that can help us understand campaign performance too?","sent_at":"2026-07-09T03:10:00Z"}]}
+  ]
+}

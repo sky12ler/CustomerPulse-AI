@@ -1,0 +1,4 @@
+campaign_id,campaign_name,channel,status,audience_size,impressions,clicks,responses,conversions,revenue,recorded_at
+CAM-001,Workspace adoption tips,Email,completed,18,18,8,4,2,14400,2026-04-30
+CAM-002,Inventory planning guide,LinkedIn,approved,12,940,72,11,3,28800,2026-06-30
+CAM-003,Value clarity,LinkedIn,draft,8,0,0,0,0,0,2026-07-18

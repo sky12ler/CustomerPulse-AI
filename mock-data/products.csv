@@ -1,0 +1,7 @@
+product_sku,product_name,category,description,standard_price,promotion_price,promotion_start,promotion_end,inventory_status,product_url
+PRD-001,Enterprise Support,Service,"Priority support and governed service review",24000,,,,available,https://example.invalid/products/enterprise-support
+PRD-002,Cloud Workspace,Software,"Secure shared workspace for distributed teams",12000,,,,available,https://example.invalid/products/cloud-workspace
+PRD-003,Analytics Suite,Analytics,"Campaign and customer performance dashboards",18000,16500,2026-07-01,2026-07-31,available,https://example.invalid/products/analytics-suite
+PRD-004,Retail Essentials,Software,"Order and retail operations toolkit",9600,,,,available,https://example.invalid/products/retail-essentials
+PRD-005,Inventory Optimizer,Analytics,"Planning views for inventory demand and movement",14400,,,,limited,https://example.invalid/products/inventory-optimizer
+PRD-006,Team Workspace,Software,"Collaboration workspace for growing teams",7200,,,,available,https://example.invalid/products/team-workspace

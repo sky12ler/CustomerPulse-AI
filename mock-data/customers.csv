@@ -1,0 +1,31 @@
+customer_external_id,customer_name,company_name,industry,region,assigned_staff_email,email,phone,preferred_channel,consent_status,customer_since
+CUS-1001,Maya Tan,Northstar Labs (Demo),Technology,Central,account.executive@customerpulse.demo,maya@northstar.example,601155501001,WhatsApp,granted,2019-02-15
+CUS-1002,Ethan Lim,Bloom & Byte Studio (Demo),Creative services,South,account.executive@customerpulse.demo,ethan@bloombyte.example,601155501002,Email,granted,2024-06-10
+CUS-1003,Priya Nair,Harbor Foods Collective (Demo),Food & beverage,North,account.executive@customerpulse.demo,priya@harborfoods.example,601155501003,Email,granted,2021-01-19
+CUS-1004,Omar Aziz,Cedar Health Systems (Demo),Healthcare,East,account.executive@customerpulse.demo,omar@cedarhealth.example,601155501004,WhatsApp,granted,2020-08-05
+CUS-1005,Noah Demo,Paper Kite Co. (Demo),Retail,North,account.executive@customerpulse.demo,noah@synthetic.example,601155501005,WhatsApp,withdrawn,2024-01-05
+CUS-1006,Sofia Demo,Verdant Works (Demo),Education,Central,account.executive@customerpulse.demo,sofia@synthetic.example,601155501006,Email,granted,2023-03-11
+CUS-1007,Lucas Demo,Copper Moon Retail (Demo),Hospitality,South,account.executive@customerpulse.demo,lucas@synthetic.example,601155501007,WhatsApp,granted,2022-05-12
+CUS-1008,Amara Demo,Atlas Learning (Demo),Professional services,East,account.executive@customerpulse.demo,amara@synthetic.example,601155501008,Email,granted,2021-04-13
+CUS-1009,Kai Demo,Lumen Logistics (Demo),Retail,North,account.executive@customerpulse.demo,kai@synthetic.example,601155501009,WhatsApp,granted,2020-09-14
+CUS-1010,Nadia Demo,Mosaic Hospitality (Demo),Education,Central,account.executive@customerpulse.demo,nadia@synthetic.example,601155501010,Email,granted,2019-11-15
+CUS-1011,Ravi Demo,Paper Kite Co. (Demo),Hospitality,South,account.executive@customerpulse.demo,ravi@synthetic.example,601155501011,WhatsApp,granted,2024-01-16
+CUS-1012,Mei Demo,Verdant Works (Demo),Professional services,East,account.executive@customerpulse.demo,mei@synthetic.example,601155501012,Email,withdrawn,2023-02-17
+CUS-1013,Zara Demo,Copper Moon Retail (Demo),Retail,North,account.executive@customerpulse.demo,zara@synthetic.example,601155501013,WhatsApp,granted,2022-03-18
+CUS-1014,Jon Demo,Atlas Learning (Demo),Education,Central,account.executive@customerpulse.demo,jon@synthetic.example,601155501014,Email,granted,2021-04-19
+CUS-1015,Iris Demo,Lumen Logistics (Demo),Hospitality,South,account.executive@customerpulse.demo,iris@synthetic.example,601155501015,WhatsApp,granted,2020-05-20
+CUS-1016,Adam Demo,Mosaic Hospitality (Demo),Professional services,East,account.executive@customerpulse.demo,adam@synthetic.example,601155501016,Email,granted,2019-06-21
+CUS-1017,Lina Demo,Paper Kite Co. (Demo),Retail,North,account.executive@customerpulse.demo,lina@synthetic.example,601155501017,WhatsApp,granted,2024-07-22
+CUS-1018,Theo Demo,Verdant Works (Demo),Education,Central,account.executive@customerpulse.demo,theo@synthetic.example,601155501018,Email,granted,2023-08-23
+CUS-1019,Sam Demo,Copper Moon Retail (Demo),Hospitality,South,account.executive@customerpulse.demo,sam@synthetic.example,601155501019,WhatsApp,withdrawn,2022-09-24
+CUS-1020,Hana Demo,Atlas Learning (Demo),Professional services,East,account.executive@customerpulse.demo,hana@synthetic.example,601155501020,Email,granted,2021-10-25
+CUS-1021,Leo Demo,Lumen Logistics (Demo),Retail,North,account.executive@customerpulse.demo,leo@synthetic.example,601155501021,WhatsApp,granted,2020-11-26
+CUS-1022,Anika Demo,Mosaic Hospitality (Demo),Education,Central,account.executive@customerpulse.demo,anika@synthetic.example,601155501022,Email,granted,2019-12-27
+CUS-1023,Ben Demo,Paper Kite Co. (Demo),Hospitality,South,account.executive@customerpulse.demo,ben@synthetic.example,601155501023,WhatsApp,granted,2024-01-28
+CUS-1024,Yasmin Demo,Verdant Works (Demo),Professional services,East,account.executive@customerpulse.demo,yasmin@synthetic.example,601155501024,Email,granted,2023-02-01
+CUS-1025,Arun Demo,Copper Moon Retail (Demo),Retail,North,account.executive@customerpulse.demo,arun@synthetic.example,601155501025,WhatsApp,granted,2022-03-02
+CUS-1026,Elle Demo,Atlas Learning (Demo),Education,Central,account.executive@customerpulse.demo,elle@synthetic.example,601155501026,Email,withdrawn,2021-04-03
+CUS-1027,Max Demo,Lumen Logistics (Demo),Hospitality,South,account.executive@customerpulse.demo,max@synthetic.example,601155501027,WhatsApp,granted,2020-05-04
+CUS-1028,Sara Demo,Mosaic Hospitality (Demo),Professional services,East,account.executive@customerpulse.demo,sara@synthetic.example,601155501028,Email,granted,2019-06-05
+CUS-1029,Ian Demo,Paper Kite Co. (Demo),Retail,North,account.executive@customerpulse.demo,ian@synthetic.example,601155501029,WhatsApp,granted,2024-07-06
+CUS-1030,Nora Demo,Verdant Works (Demo),Education,Central,account.executive@customerpulse.demo,nora@synthetic.example,601155501030,Email,granted,2023-08-07

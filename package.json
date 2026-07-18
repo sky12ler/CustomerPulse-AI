@@ -1,0 +1,41 @@
+{
+  "name": "customerpulse-ai",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@supabase/ssr": "0.12.3",
+    "@supabase/supabase-js": "2.110.7",
+    "clsx": "2.1.1",
+    "lucide-react": "1.25.0",
+    "next": "16.2.10",
+    "openai": "6.48.0",
+    "papaparse": "5.5.4",
+    "pdf-lib": "1.17.1",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "recharts": "3.9.2",
+    "sharp": "0.35.3",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "@types/node": "26.1.1",
+    "@types/papaparse": "5.5.2",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.2.10",
+    "typescript": "6.0.3",
+    "vitest": "4.1.10"
+  }
+}
