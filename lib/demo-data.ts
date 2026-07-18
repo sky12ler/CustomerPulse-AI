@@ -1,53 +1,483 @@
 import type { AuditEvent, Customer, Recommendation } from "./types";
 
-const msg=(id:string,sender:"customer"|"staff",senderName:string,text:string,daysAgo:number,channel:"WhatsApp"|"Email"|"Support chat"="WhatsApp",evidence=false)=>({id,sender,senderName,text,sentAt:new Date(Date.now()-daysAgo*86400000).toISOString(),channel,evidence});
+const msg = (
+  id: string,
+  sender: "customer" | "staff",
+  senderName: string,
+  text: string,
+  daysAgo: number,
+  channel: "WhatsApp" | "Email" | "Support chat" = "WhatsApp",
+  evidence = false,
+) => ({
+  id,
+  sender,
+  senderName,
+  text,
+  sentAt: new Date(Date.now() - daysAgo * 86400000).toISOString(),
+  channel,
+  evidence,
+});
 
-const special:Customer[]=[
- {id:"CUS-1001",name:"Maya Tan",company:"Northstar Labs (Demo)",industry:"Technology",region:"Central",staff:"Aisha Rahman",email:"maya@northstar.example",phone:"601155501001",tier:"Strategic",tierScore:91,risk:"Critical",riskScore:86,confidence:92,ltv:186400,revenueAtRisk:72400,sentiment:"Negative",consent:true,preferredChannel:"WhatsApp",lastPurchase:"2026-05-03",frequencyTrend:-38,spendTrend:-31,products:["Enterprise Support","Cloud Workspace"],productGap:"Analytics Suite",alerts:3,status:"Needs recovery",scenario:"A",messages:[
-   msg("MSG-A-101","customer","Maya Tan","Our second delivery was late again and the replacement still has not arrived. Please resolve this before discussing any promotion.",18,"WhatsApp",true),
-   msg("MSG-A-102","staff","Aisha Rahman","I will confirm the replacement status by Friday.",17,"WhatsApp",true),
-   msg("MSG-A-103","customer","Maya Tan","Friday passed with no update. We are reviewing a competitor for the next renewal.",10,"WhatsApp",true),
-   msg("MSG-A-104","customer","Maya Tan","If this cannot be fixed this week, we may cancel the support contract.",4,"Email",true)]},
- {id:"CUS-1002",name:"Ethan Lim",company:"Bloom & Byte Studio (Demo)",industry:"Creative services",region:"South",staff:"Daniel Wong",email:"ethan@bloombyte.example",phone:"601155501002",tier:"Growth",tierScore:53,risk:"Low",riskScore:18,confidence:88,ltv:28600,revenueAtRisk:5100,sentiment:"Positive",consent:true,preferredChannel:"Email",lastPurchase:"2026-07-02",frequencyTrend:22,spendTrend:18,products:["Team Workspace"],productGap:"Analytics Suite",alerts:0,status:"Cross-sell opportunity",scenario:"B",messages:[
-   msg("MSG-B-201","customer","Ethan Lim","The workspace rollout went really well. Do you have something that can help us understand campaign performance too?",9,"Email",true),
-   msg("MSG-B-202","staff","Daniel Wong","Glad the rollout is working well. I will check the approved catalogue for a suitable analytics option.",8,"Email",true)]},
- {id:"CUS-1003",name:"Priya Nair",company:"Harbor Foods Collective (Demo)",industry:"Food & beverage",region:"North",staff:"Aisha Rahman",email:"priya@harborfoods.example",phone:"601155501003",tier:"Core",tierScore:67,risk:"High",riskScore:68,confidence:86,ltv:78200,revenueAtRisk:35400,sentiment:"Negative",consent:true,preferredChannel:"Email",lastPurchase:"2026-05-27",frequencyTrend:-27,spendTrend:-21,products:["Retail Essentials"],productGap:"Inventory Optimizer",alerts:2,status:"Price objection",scenario:"C",messages:[
-   msg("MSG-C-301","customer","Priya Nair","Our order volume is lower because the current package price is difficult to justify this quarter.",14,"Support chat",true),
-   msg("MSG-C-302","staff","Aisha Rahman","I understand. I can document your needs and review permitted options with my manager.",13,"Support chat") ]},
- {id:"CUS-1004",name:"Omar Aziz",company:"Cedar Health Systems (Demo)",industry:"Healthcare",region:"East",staff:"Daniel Wong",email:"omar@cedarhealth.example",phone:"601155501004",tier:"Core",tierScore:72,risk:"Medium",riskScore:42,confidence:94,ltv:96100,revenueAtRisk:18200,sentiment:"Positive",consent:true,preferredChannel:"WhatsApp",lastPurchase:"2026-06-28",frequencyTrend:12,spendTrend:16,products:["Enterprise Support","Analytics Suite"],alerts:0,status:"Recovered",scenario:"D",messages:[
-   msg("MSG-D-401","staff","Daniel Wong","Your service recovery plan was approved. The replacement and check-in are confirmed under our service policy.",25,"WhatsApp",true),
-   msg("MSG-D-402","customer","Omar Aziz","Thank you for sorting this out. The replacement arrived and we have placed our next order.",20,"WhatsApp",true)]}
+const special: Customer[] = [
+  {
+    id: "CUS-1001",
+    name: "Maya Tan",
+    company: "Northstar Labs (Demo)",
+    industry: "Technology",
+    region: "Central",
+    staff: "Aisha Rahman",
+    email: "maya@northstar.example",
+    phone: "601155501001",
+    tier: "Strategic",
+    tierScore: 91,
+    risk: "Critical",
+    riskScore: 86,
+    confidence: 92,
+    ltv: 186400,
+    revenueAtRisk: 72400,
+    sentiment: "Negative",
+    consent: true,
+    preferredChannel: "WhatsApp",
+    lastPurchase: "2026-05-03",
+    frequencyTrend: -38,
+    spendTrend: -31,
+    products: ["Enterprise Support", "Cloud Workspace"],
+    productGap: "Analytics Suite",
+    alerts: 3,
+    status: "Needs recovery",
+    scenario: "A",
+    messages: [
+      msg(
+        "MSG-A-101",
+        "customer",
+        "Maya Tan",
+        "Our second delivery was late again and the replacement still has not arrived. Please resolve this before discussing any promotion.",
+        18,
+        "WhatsApp",
+        true,
+      ),
+      msg(
+        "MSG-A-102",
+        "staff",
+        "Aisha Rahman",
+        "I will confirm the replacement status by Friday.",
+        17,
+        "WhatsApp",
+        true,
+      ),
+      msg(
+        "MSG-A-103",
+        "customer",
+        "Maya Tan",
+        "Friday passed with no update. We are reviewing a competitor for the next renewal.",
+        10,
+        "WhatsApp",
+        true,
+      ),
+      msg(
+        "MSG-A-104",
+        "customer",
+        "Maya Tan",
+        "If this cannot be fixed this week, we may cancel the support contract.",
+        4,
+        "Email",
+        true,
+      ),
+    ],
+  },
+  {
+    id: "CUS-1002",
+    name: "Ethan Lim",
+    company: "Bloom & Byte Studio (Demo)",
+    industry: "Creative services",
+    region: "South",
+    staff: "Daniel Wong",
+    email: "ethan@bloombyte.example",
+    phone: "601155501002",
+    tier: "Growth",
+    tierScore: 53,
+    risk: "Low",
+    riskScore: 18,
+    confidence: 88,
+    ltv: 28600,
+    revenueAtRisk: 5100,
+    sentiment: "Positive",
+    consent: true,
+    preferredChannel: "Email",
+    lastPurchase: "2026-07-02",
+    frequencyTrend: 22,
+    spendTrend: 18,
+    products: ["Team Workspace"],
+    productGap: "Analytics Suite",
+    alerts: 0,
+    status: "Cross-sell opportunity",
+    scenario: "B",
+    messages: [
+      msg(
+        "MSG-B-201",
+        "customer",
+        "Ethan Lim",
+        "The workspace rollout went really well. Do you have something that can help us understand campaign performance too?",
+        9,
+        "Email",
+        true,
+      ),
+      msg(
+        "MSG-B-202",
+        "staff",
+        "Daniel Wong",
+        "Glad the rollout is working well. I will check the approved catalogue for a suitable analytics option.",
+        8,
+        "Email",
+        true,
+      ),
+    ],
+  },
+  {
+    id: "CUS-1003",
+    name: "Priya Nair",
+    company: "Harbor Foods Collective (Demo)",
+    industry: "Food & beverage",
+    region: "North",
+    staff: "Aisha Rahman",
+    email: "priya@harborfoods.example",
+    phone: "601155501003",
+    tier: "Core",
+    tierScore: 67,
+    risk: "High",
+    riskScore: 68,
+    confidence: 86,
+    ltv: 78200,
+    revenueAtRisk: 35400,
+    sentiment: "Negative",
+    consent: true,
+    preferredChannel: "Email",
+    lastPurchase: "2026-05-27",
+    frequencyTrend: -27,
+    spendTrend: -21,
+    products: ["Retail Essentials"],
+    productGap: "Inventory Optimizer",
+    alerts: 2,
+    status: "Price objection",
+    scenario: "C",
+    messages: [
+      msg(
+        "MSG-C-301",
+        "customer",
+        "Priya Nair",
+        "Our order volume is lower because the current package price is difficult to justify this quarter.",
+        14,
+        "Support chat",
+        true,
+      ),
+      msg(
+        "MSG-C-302",
+        "staff",
+        "Aisha Rahman",
+        "I understand. I can document your needs and review permitted options with my manager.",
+        13,
+        "Support chat",
+      ),
+    ],
+  },
+  {
+    id: "CUS-1004",
+    name: "Omar Aziz",
+    company: "Cedar Health Systems (Demo)",
+    industry: "Healthcare",
+    region: "East",
+    staff: "Daniel Wong",
+    email: "omar@cedarhealth.example",
+    phone: "601155501004",
+    tier: "Core",
+    tierScore: 72,
+    risk: "Medium",
+    riskScore: 42,
+    confidence: 94,
+    ltv: 96100,
+    revenueAtRisk: 18200,
+    sentiment: "Positive",
+    consent: true,
+    preferredChannel: "WhatsApp",
+    lastPurchase: "2026-06-28",
+    frequencyTrend: 12,
+    spendTrend: 16,
+    products: ["Enterprise Support", "Analytics Suite"],
+    alerts: 0,
+    status: "Recovered",
+    scenario: "D",
+    messages: [
+      msg(
+        "MSG-D-401",
+        "staff",
+        "Daniel Wong",
+        "Your service recovery plan was approved. The replacement and check-in are confirmed under our service policy.",
+        25,
+        "WhatsApp",
+        true,
+      ),
+      msg(
+        "MSG-D-402",
+        "customer",
+        "Omar Aziz",
+        "Thank you for sorting this out. The replacement arrived and we have placed our next order.",
+        20,
+        "WhatsApp",
+        true,
+      ),
+    ],
+  },
 ];
 
-const first=["Noah","Sofia","Lucas","Amara","Kai","Nadia","Ravi","Mei","Zara","Jon","Iris","Adam","Lina","Theo","Sam","Hana","Leo","Anika","Ben","Yasmin","Arun","Elle","Max","Sara","Ian","Nora"];
-const companies=["Paper Kite Co.","Verdant Works", "Copper Moon Retail", "Atlas Learning", "Lumen Logistics", "Mosaic Hospitality"];
-const tiers=(i:number)=>["Standard","Growth","Core","Strategic"][i%4] as Customer["tier"];
-const risks=(i:number)=>["Low","Medium","Low","High"][i%4] as Customer["risk"];
-export const customers:Customer[]=[...special,...first.map((name,i)=>{
- const risk=risks(i),score=risk==="High"?64+i%10:risk==="Medium"?38+i%14:12+i%15;
- const sentiment:Customer["sentiment"]=i%5===0?"Negative":i%3===0?"Positive":"Neutral";
- return {id:`CUS-${1005+i}`,name:`${name} Demo`,company:`${companies[i%companies.length]} (Demo)`,industry:["Retail","Education","Hospitality","Professional services"][i%4],region:["North","Central","South","East"][i%4],staff:i%2?"Daniel Wong":"Aisha Rahman",email:`${name.toLowerCase()}@synthetic.example`,phone:`60115550${String(1005+i).slice(-4)}`,tier:tiers(i),tierScore:28+(i*7)%68,risk,riskScore:score,confidence:74+i%20,ltv:12000+i*4100,revenueAtRisk:Math.round((12000+i*4100)*score/100),sentiment,consent:i%7!==0,preferredChannel:i%2?"Email":"WhatsApp",lastPurchase:`2026-0${(i%6)+1}-${String((i%26)+1).padStart(2,"0")}`,frequencyTrend:i%4===3?-22:4+i%16,spendTrend:i%5===0?-18:3+i%12,products:[["Team Workspace"],["Retail Essentials","Analytics Suite"],["Cloud Workspace"]][i%3],productGap:i%3===0?"Analytics Suite":undefined,alerts:risk==="High"?1:0,status:risk==="High"?"Review required":"Monitored",messages:[msg(`MSG-${500+i}`,"customer",`${name} Demo`,i%5===0?"The price is becoming difficult for our team. Please share only approved options.":"Thanks for the update. Everything is progressing as expected.",i%20+1,i%2?"Email":"Support chat",i%5===0)]};
-})];
-
-export const recommendations:Recommendation[]=[
- {id:"REC-001",customerId:"CUS-1001",action:"Resolve both delivery complaints before any promotion",explanation:"Two unresolved delivery complaints, a missed follow-up, and cancellation language outweigh promotional intent.",priority:"Urgent",status:"Pending Approval",channel:"WhatsApp",confidence:"High",owner:"Aisha Rahman",deadline:"Within 24 hours"},
- {id:"REC-002",customerId:"CUS-1002",action:"Introduce Analytics Suite from the approved catalogue",explanation:"The customer explicitly asked for campaign-performance insight and has positive engagement.",priority:"Medium",status:"Draft",channel:"Email",confidence:"High",owner:"Daniel Wong",deadline:"Within 5 days"},
- {id:"REC-003",customerId:"CUS-1004",action:"Complete recovery check-in",explanation:"A successful replacement and a subsequent purchase indicate recovery; confirm continued satisfaction.",priority:"Low",status:"Executed",channel:"WhatsApp",confidence:"High",owner:"Daniel Wong",deadline:"Completed"}
+const first = [
+  "Noah",
+  "Sofia",
+  "Lucas",
+  "Amara",
+  "Kai",
+  "Nadia",
+  "Ravi",
+  "Mei",
+  "Zara",
+  "Jon",
+  "Iris",
+  "Adam",
+  "Lina",
+  "Theo",
+  "Sam",
+  "Hana",
+  "Leo",
+  "Anika",
+  "Ben",
+  "Yasmin",
+  "Arun",
+  "Elle",
+  "Max",
+  "Sara",
+  "Ian",
+  "Nora",
+];
+const companies = [
+  "Paper Kite Co.",
+  "Verdant Works",
+  "Copper Moon Retail",
+  "Atlas Learning",
+  "Lumen Logistics",
+  "Mosaic Hospitality",
+];
+const tiers = (i: number) =>
+  ["Standard", "Growth", "Core", "Strategic"][i % 4] as Customer["tier"];
+const risks = (i: number) =>
+  ["Low", "Medium", "Low", "High"][i % 4] as Customer["risk"];
+export const customers: Customer[] = [
+  ...special,
+  ...first.map((name, i) => {
+    const risk = risks(i),
+      score =
+        risk === "High"
+          ? 64 + (i % 10)
+          : risk === "Medium"
+            ? 38 + (i % 14)
+            : 12 + (i % 15);
+    const sentiment: Customer["sentiment"] =
+      i % 5 === 0 ? "Negative" : i % 3 === 0 ? "Positive" : "Neutral";
+    const inDecliningSegment = i < 11;
+    const scenario: Customer["scenario"] = inDecliningSegment ? "C" : undefined;
+    return {
+      id: `CUS-${1005 + i}`,
+      name: `${name} Demo`,
+      company: `${companies[i % companies.length]} (Demo)`,
+      industry: inDecliningSegment
+        ? "Food & beverage"
+        : ["Retail", "Education", "Hospitality", "Professional services"][
+            i % 4
+          ],
+      region: inDecliningSegment
+        ? "North"
+        : ["North", "Central", "South", "East"][i % 4],
+      staff: i % 2 ? "Daniel Wong" : "Aisha Rahman",
+      email: `${name.toLowerCase()}@synthetic.example`,
+      phone: `60115550${String(1005 + i).slice(-4)}`,
+      tier: tiers(i),
+      tierScore: 28 + ((i * 7) % 68),
+      risk,
+      riskScore: score,
+      confidence: 74 + (i % 20),
+      ltv: 12000 + i * 4100,
+      revenueAtRisk: Math.round(((12000 + i * 4100) * score) / 100),
+      sentiment,
+      consent: i % 7 !== 0,
+      preferredChannel: i % 2 ? "Email" : "WhatsApp",
+      lastPurchase: `2026-0${(i % 6) + 1}-${String((i % 26) + 1).padStart(2, "0")}`,
+      frequencyTrend:
+        inDecliningSegment && i < 4 ? -24 : i % 4 === 3 ? -22 : 4 + (i % 16),
+      spendTrend:
+        inDecliningSegment && i < 5 ? -18 : i % 5 === 0 ? -18 : 3 + (i % 12),
+      products: [
+        ["Team Workspace"],
+        ["Retail Essentials", "Analytics Suite"],
+        ["Cloud Workspace"],
+      ][i % 3],
+      productGap: i % 3 === 0 ? "Analytics Suite" : undefined,
+      alerts: risk === "High" ? 1 : 0,
+      status: risk === "High" ? "Review required" : "Monitored",
+      scenario,
+      messages: [
+        msg(
+          `MSG-${500 + i}`,
+          "customer",
+          `${name} Demo`,
+          inDecliningSegment && (i % 3 === 0 || i % 5 === 0)
+            ? "The current package price is difficult to justify and our order frequency is falling."
+            : "Thanks for the update. Everything is progressing as expected.",
+          (i % 20) + 1,
+          i % 2 ? "Email" : "Support chat",
+          inDecliningSegment && (i % 3 === 0 || i % 5 === 0),
+        ),
+      ],
+    };
+  }),
 ];
 
-export const audits:AuditEvent[]=[
- {id:"AUD-9201",actor:"Aisha Rahman",role:"Account Executive",action:"AVO recommendation submitted",entity:"REC-001",result:"Pending Approval",at:"2026-07-18 09:42",correlationId:"COR-A-1001"},
- {id:"AUD-9200",actor:"AVO Demo Provider",role:"Administrator",action:"Conversation analysis",entity:"CUS-1001",result:"Evidence validated",at:"2026-07-18 09:37",correlationId:"COR-A-1001"},
- {id:"AUD-9199",actor:"System",role:"Administrator",action:"Critical alert created",entity:"ALT-001",result:"Success",at:"2026-07-18 09:36",correlationId:"COR-A-1001"},
- {id:"AUD-9178",actor:"Farah Chen",role:"Sales Manager",action:"Retention action approved",entity:"ACT-014",result:"Approved",at:"2026-06-24 14:10",correlationId:"COR-D-1004"},
- {id:"AUD-9171",actor:"Omar Aziz",role:"Auditor",action:"Customer response recorded",entity:"CUS-1004",result:"Positive",at:"2026-06-28 11:20",correlationId:"COR-D-1004"},
- {id:"AUD-9150",actor:"Mina Lee",role:"Marketing Manager",action:"Campaign approved",entity:"CAM-002",result:"Approved",at:"2026-06-16 15:02",correlationId:"COR-C-PRICE"},
- {id:"AUD-9149",actor:"Demo Publisher",role:"Administrator",action:"Campaign scheduled",entity:"CAM-002",result:"Simulated",at:"2026-06-16 15:05",correlationId:"COR-C-PRICE"}
+export const recommendations: Recommendation[] = [
+  {
+    id: "REC-001",
+    customerId: "CUS-1001",
+    action: "Resolve both delivery complaints before any promotion",
+    explanation:
+      "Two unresolved delivery complaints, a missed follow-up, and cancellation language outweigh promotional intent.",
+    priority: "Urgent",
+    status: "Pending Approval",
+    channel: "WhatsApp",
+    confidence: "High",
+    owner: "Aisha Rahman",
+    deadline: "Within 24 hours",
+  },
+  {
+    id: "REC-002",
+    customerId: "CUS-1002",
+    action: "Introduce Analytics Suite from the approved catalogue",
+    explanation:
+      "The customer explicitly asked for campaign-performance insight and has positive engagement.",
+    priority: "Medium",
+    status: "Draft",
+    channel: "Email",
+    confidence: "High",
+    owner: "Daniel Wong",
+    deadline: "Within 5 days",
+  },
+  {
+    id: "REC-003",
+    customerId: "CUS-1004",
+    action: "Complete recovery check-in",
+    explanation:
+      "A successful replacement and a subsequent purchase indicate recovery; confirm continued satisfaction.",
+    priority: "Low",
+    status: "Executed",
+    channel: "WhatsApp",
+    confidence: "High",
+    owner: "Daniel Wong",
+    deadline: "Completed",
+  },
 ];
 
-export const tiersChart=[{name:"Strategic",value:8},{name:"Core",value:9},{name:"Growth",value:7},{name:"Standard",value:6}];
-export const riskChart=[{name:"Low",value:13},{name:"Medium",value:8},{name:"High",value:7},{name:"Critical",value:2}];
-export const trendChart=[{month:"Feb",risk:41,revenue:620},{month:"Mar",risk:45,revenue:601},{month:"Apr",risk:48,revenue:584},{month:"May",risk:53,revenue:552},{month:"Jun",risk:50,revenue:568},{month:"Jul",risk:46,revenue:591}];
-export const demoAccounts=[
- ["admin@customerpulse.demo","Administrator"],["sales.manager@customerpulse.demo","Sales Manager"],["marketing.manager@customerpulse.demo","Marketing Manager"],["account.executive@customerpulse.demo","Account Executive"],["auditor@customerpulse.demo","Auditor / Viewer"]
+export const audits: AuditEvent[] = [
+  {
+    id: "AUD-9201",
+    actor: "Aisha Rahman",
+    role: "Account Executive",
+    action: "AVO recommendation submitted",
+    entity: "REC-001",
+    result: "Pending Approval",
+    at: "2026-07-18 09:42",
+    correlationId: "COR-A-1001",
+  },
+  {
+    id: "AUD-9200",
+    actor: "AVO Demo Provider",
+    role: "Administrator",
+    action: "Conversation analysis",
+    entity: "CUS-1001",
+    result: "Evidence validated",
+    at: "2026-07-18 09:37",
+    correlationId: "COR-A-1001",
+  },
+  {
+    id: "AUD-9199",
+    actor: "System",
+    role: "Administrator",
+    action: "Critical alert created",
+    entity: "ALT-001",
+    result: "Success",
+    at: "2026-07-18 09:36",
+    correlationId: "COR-A-1001",
+  },
+  {
+    id: "AUD-9178",
+    actor: "Farah Chen",
+    role: "Sales Manager",
+    action: "Retention action approved",
+    entity: "ACT-014",
+    result: "Approved",
+    at: "2026-06-24 14:10",
+    correlationId: "COR-D-1004",
+  },
+  {
+    id: "AUD-9171",
+    actor: "Omar Aziz",
+    role: "Auditor",
+    action: "Customer response recorded",
+    entity: "CUS-1004",
+    result: "Positive",
+    at: "2026-06-28 11:20",
+    correlationId: "COR-D-1004",
+  },
+  {
+    id: "AUD-9150",
+    actor: "Mina Lee",
+    role: "Marketing Manager",
+    action: "Campaign approved",
+    entity: "CAM-002",
+    result: "Approved",
+    at: "2026-06-16 15:02",
+    correlationId: "COR-C-PRICE",
+  },
+  {
+    id: "AUD-9149",
+    actor: "Demo Publisher",
+    role: "Administrator",
+    action: "Campaign scheduled",
+    entity: "CAM-002",
+    result: "Simulated",
+    at: "2026-06-16 15:05",
+    correlationId: "COR-C-PRICE",
+  },
+];
+
+export const tiersChart = [
+  { name: "Strategic", value: 8 },
+  { name: "Core", value: 9 },
+  { name: "Growth", value: 7 },
+  { name: "Standard", value: 6 },
+];
+export const riskChart = [
+  { name: "Low", value: 13 },
+  { name: "Medium", value: 8 },
+  { name: "High", value: 7 },
+  { name: "Critical", value: 2 },
+];
+export const trendChart = [
+  { month: "Feb", risk: 41, revenue: 620 },
+  { month: "Mar", risk: 45, revenue: 601 },
+  { month: "Apr", risk: 48, revenue: 584 },
+  { month: "May", risk: 53, revenue: 552 },
+  { month: "Jun", risk: 50, revenue: 568 },
+  { month: "Jul", risk: 46, revenue: 591 },
+];
+export const demoAccounts = [
+  ["admin@customerpulse.demo", "Administrator"],
+  ["sales.manager@customerpulse.demo", "Sales Manager"],
+  ["marketing.manager@customerpulse.demo", "Marketing Manager"],
+  ["account.executive@customerpulse.demo", "Account Executive"],
+  ["auditor@customerpulse.demo", "Auditor / Viewer"],
 ];

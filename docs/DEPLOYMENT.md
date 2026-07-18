@@ -1,6 +1,6 @@
 # Deployment
 
-1. Create a Supabase project and run `supabase db push`, then `supabase db reset` for demo environments.
+1. Create and link a Supabase project, then run `supabase db push`. Use `supabase db reset` only for a disposable local demo; use `node scripts/reset-demo.mjs --confirm` for an explicitly configured demo project.
 2. Create Storage buckets for imports/documents/assets; keep them private and use signed URLs.
 3. Add Supabase URL/anon key and server-side service role to Vercel.
 4. Optionally add `OPENAI_API_KEY`, `OPENAI_MODEL=gpt-5.6`, `BUFFER_API_KEY` and Buffer organisation ID.

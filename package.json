@@ -10,17 +10,20 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "node scripts/run-e2e.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.3",
     "@supabase/supabase-js": "2.110.7",
     "clsx": "2.1.1",
+    "exceljs": "4.4.0",
     "lucide-react": "1.25.0",
+    "mammoth": "1.12.0",
     "next": "16.2.10",
     "openai": "6.48.0",
     "papaparse": "5.5.4",
     "pdf-lib": "1.17.1",
+    "pdf-parse": "2.4.5",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "recharts": "3.9.2",
@@ -35,10 +38,12 @@
     "@types/react-dom": "19.2.3",
     "eslint": "9.39.5",
     "eslint-config-next": "16.2.10",
+    "prettier": "3.8.2",
     "typescript": "6.0.3",
     "vitest": "4.1.10"
   },
   "overrides": {
-    "postcss": "8.5.10"
+    "postcss": "8.5.10",
+    "uuid": "11.1.1"
   }
 }

@@ -37,17 +37,17 @@ Open `http://localhost:3000`. No credentials are required for the complete simul
 
 The UI role selector makes the local no-credential demo instant. Seeded Supabase accounts use password `PulseDemo!2026`:
 
-| Account | Role |
-|---|---|
-| admin@customerpulse.demo | Administrator |
-| sales.manager@customerpulse.demo | Sales Manager |
+| Account                              | Role              |
+| ------------------------------------ | ----------------- |
+| admin@customerpulse.demo             | Administrator     |
+| sales.manager@customerpulse.demo     | Sales Manager     |
 | marketing.manager@customerpulse.demo | Marketing Manager |
 | account.executive@customerpulse.demo | Account Executive |
-| auditor@customerpulse.demo | Auditor / Viewer |
+| auditor@customerpulse.demo           | Auditor / Viewer  |
 
 ## Mock data and imports
 
-Permanent populated templates and grounding assets live in [`mock-data`](mock-data). They remain after import and are downloadable on Data Imports. `node scripts/reset-demo.mjs` reloads customer seed data into configured Supabase; `supabase db reset` applies migrations and `seed.sql`. See [Mock Data](docs/MOCK_DATA.md) and [Data Imports](docs/DATA_IMPORTS.md).
+Permanent populated templates and grounding assets live in [`mock-data`](mock-data). They remain after import and are downloadable on Data Imports. `node scripts/reset-demo.mjs --confirm` reloads customer seed data into configured Supabase; `supabase db reset` applies migrations and `seed.sql`. See [Mock Data](docs/MOCK_DATA.md) and [Data Imports](docs/DATA_IMPORTS.md).
 
 ## Demo scenarios
 
@@ -67,7 +67,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-Tests cover tier/risk boundaries, evidence validation, injection detection, consent, WhatsApp links, segment triggers, approval enforcement, idempotent publishing and permanent files. See [Testing](docs/TESTING.md).
+The verified suite contains 47 unit tests and 8 production-browser workflows covering all permanent imports, Scenarios A-D, approval and consent bypass attempts, RBAC, downloads and audit controls. See [Testing](docs/TESTING.md) and the [P0 acceptance matrix](docs/P0_ACCEPTANCE.md).
 
 ## Privacy and AI governance
 
@@ -75,11 +75,11 @@ The platform provides privacy-supporting controls, not regulatory certification.
 
 ## Deployment
 
-The repository is prepared for GitHub, Supabase and Vercel with a health endpoint at `/api/health`, SQL migration/seed, `.env.example`, demo fallback and deployment checklist. See [Deployment](docs/DEPLOYMENT.md).
+The repository is prepared for GitHub, Supabase and Vercel with a health endpoint at `/api/health`, SQL migration/seed, `.env.example`, demo fallback and deployment checklist. See [Deployment](docs/DEPLOYMENT.md) and the [final handoff](docs/FINAL_HANDOFF.md).
 
 ## Limitations and human decisions
 
-Live WhatsApp/email ingestion, CRM integrations, paid audiences, model training and autonomous outreach are out of scope. Buffer analytics are not claimed by the current publisher implementation. Employees decide overrides, approvals, messages, offers, exports and publication. AVO never makes final business decisions.
+Live WhatsApp/email ingestion, CRM integrations, paid audiences, model training and autonomous outreach are out of scope. With no credentials, live OpenAI, Buffer, Supabase and Vercel operations are not claimed. The no-credential workflow state is in-memory and resets on reload; production Supabase UI persistence and live two-tenant RLS tests remain deployment work. Employees decide overrides, approvals, messages, offers, exports and publication. AVO never makes final business decisions.
 
 ## How Codex and GPT-5.6 are used
 

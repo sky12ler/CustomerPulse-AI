@@ -9,3 +9,7 @@ CON-C,MSG-C-301,CUS-1003,Support chat,customer,Priya Nair,"Our order volume is l
 CON-C,MSG-C-302,CUS-1003,Support chat,staff,Aisha Rahman,"I understand. I can document your needs and review permitted options with my manager.",2026-07-05T08:40:00Z
 CON-D,MSG-D-401,CUS-1004,WhatsApp,staff,Daniel Wong,"Your service recovery plan was approved. The replacement and check-in are confirmed under our service policy.",2026-06-23T07:20:00Z
 CON-D,MSG-D-402,CUS-1004,WhatsApp,customer,Omar Aziz,"Thank you for sorting this out. The replacement arrived and we have placed our next order.",2026-06-28T09:12:00Z
+CON-C05,MSG-C-505,CUS-1005,Email,customer,Noah Demo,"The current package price is difficult to justify and our order frequency is falling.",2026-07-03T09:00:00Z
+CON-C08,MSG-C-508,CUS-1008,Support chat,customer,Amara Demo,"We have reduced orders because the package price is difficult to justify.",2026-07-05T10:00:00Z
+CON-C11,MSG-C-511,CUS-1011,WhatsApp,customer,Ravi Demo,"The current price is difficult to justify while demand is lower.",2026-07-07T11:00:00Z
+CON-C14,MSG-C-514,CUS-1014,Email,customer,Jon Demo,"Our engagement is lower and the package price is difficult to justify.",2026-07-09T12:00:00Z
