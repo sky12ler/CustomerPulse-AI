@@ -1,29 +1,58 @@
 # CustomerPulse AI
 
-CustomerPulse AI is an explainable customer-retention and marketing-intelligence platform built for OpenAI Build Week's Work & Productivity track. Its named assistant, **AVO**, turns authorised customer conversations and behavioural evidence into draft actions that employees review, edit, approve and execute.
+> **Turn customer evidence into explainable, human-approved retention and marketing action.**
 
-> **Synthetic Demo Data:** every bundled identity, contact, company, transaction and outcome is fictional. AVO supports staff decisions; final decisions and actions remain the responsibility of authorised employees.
+CustomerPulse AI is a governed customer-retention and marketing-intelligence workspace built for the OpenAI Build Week Work & Productivity track. Its named assistant, **AVO**, analyses authorised synthetic conversations, explains evidence, and creates editable recommendations and campaign drafts. Deterministic application logic calculates customer tiers, churn risk, consent eligibility, segment triggers, and approval constraints; authorised employees remain responsible for every material decision and action.
 
-## Problem and users
+> **Synthetic Demo Data:** every bundled identity, contact, company, transaction, conversation, campaign, and outcome is fictional. The application provides privacy-supporting controls and does not claim regulatory certification.
 
-Account teams often discover churn signals across transactions, complaints and conversations too late. Marketing teams see segment decline without a governed path from evidence to intervention. CustomerPulse serves administrators, sales managers, marketing managers, account executives and read-only auditors without becoming a generic CRM or social scheduler.
+## Why it exists
 
-## Solution and features
+Customer risk signals are commonly split across purchases, complaints, conversations, missed commitments, and campaign results. That fragmentation delays retention work and makes marketing interventions difficult to justify. CustomerPulse connects those signals to visible evidence, deterministic calculations, editable AVO assistance, role-based approval, and explicit execution without becoming an autonomous outreach system.
 
-- Customer 360 with explainable tier, risk, revenue-at-risk and source-linked signals.
-- Conversation workspace with validated AVO evidence, sentiment, intent, complaints and missed follow-ups.
-- Deterministic RFM-plus tiering and hybrid churn scoring; AVO never decides the score alone.
-- Churn/segment alert centres, editable AVO recommendations and approval histories.
-- Consent-gated WhatsApp deep links and email composition; private messages are never auto-sent.
-- Grounded campaign studio, factual-claim review, Marketing Manager approval and Buffer/demo scheduling.
-- Import validation workflow, permanent mock templates, governance controls, lineage and immutable audit reporting.
-- Demo fallback works without OpenAI, Supabase or Buffer and is labelled **AVO Demo Analysis** / simulated.
+## What the verified demo does
 
-## Architecture and stack
+- Provides a responsive 15-route workspace for Administrator, Sales Manager, Marketing Manager, Account Executive, and read-only Auditor views.
+- Shows Customer 360 records with tier, risk, confidence, lifetime value, revenue at risk, behavioural trends, product gaps, conversations, alerts, actions, campaign history, and audit history.
+- Validates CSV, XLSX, JSON, TXT, PDF, DOCX, PNG, and JPG imports with file-signature and size checks, preview, column mapping, required fields, duplicate detection, invalid-row reporting, error download, and explicit confirmation.
+- Calculates explainable deterministic RFM-plus tiers and hybrid churn risk; AVO does not set either score.
+- Runs AVO conversation analysis with sentiment, intent, complaints, product interest, objections, competitor and cancellation signals, staff commitments, evidence IDs, confidence, and uncertainty.
+- Rejects nonexistent evidence IDs, removes instruction-like customer content before live-provider submission, and abstains when evidence is insufficient.
+- Creates editable AVO recommendations and records useful, partially useful, not useful, or incorrect feedback; incorrect feedback requires a correction note.
+- Enforces manager roles, reviewer comments, rejection reasons, approval before execution, requester/AVO separation, promotion facts, severe-complaint rules, and marketing consent.
+- Opens approved WhatsApp and email deep links, creates internal tasks, and provides trackable landing-page links without auto-sending private messages.
+- Detects segment decline, shows affected customers and common evidence, and creates source-grounded campaign briefs and channel variants for human review.
+- Schedules approved campaigns through the verified, explicitly simulated Demo Publisher.
+- Shows synthetic customer, action, marketing, and AVO-governance analytics plus searchable audit records, CSV export, and printable reports.
 
-Next.js App Router, strict TypeScript, accessible custom components, Recharts, Zod, Supabase PostgreSQL/Auth/Storage/RLS, OpenAI Responses API, Buffer GraphQL API, Vitest and Playwright. Server-only provider interfaces isolate secrets. See [Architecture](docs/ARCHITECTURE.md).
+## Verified implementation status
 
-## Setup
+| Capability                | Verified status                                                                                                                                |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| AVO without credentials   | `DemoAVOProvider` verified end to end and labelled **AVO Demo Analysis**                                                                       |
+| OpenAI Responses API      | `OpenAIProvider` strict-schema request and validation contract verified with an injected transport; no external API call claimed               |
+| Campaign scheduling       | `DemoSocialPublisher` approval and idempotency verified; result labelled simulated                                                             |
+| Buffer                    | Adapter implemented and code-reviewed; live Buffer account and publishing not credential-tested                                                |
+| Demo workflow state       | In-memory for a frictionless demonstration; resets on reload                                                                                   |
+| Supabase                  | Normalized migration, RLS policies, seed SQL, SDK dependencies, and reset loader included; UI persistence is not connected or runtime-verified |
+| WhatsApp and email        | Approved, consent-gated user-initiated links; no automatic sending or live ingestion                                                           |
+| Image generation/cropping | Not implemented; documented as optional future work                                                                                            |
+
+## Architecture
+
+The runtime is a Next.js App Router application with React and strict TypeScript. Server routes handle health checks, AVO analysis, import validation, demo-file download, publishing, and trackable landing pages. Domain modules keep deterministic tiering, churn scoring, consent, segment detection, approvals, imports, AI providers, and publishers separate from the UI.
+
+`AIProvider` has `OpenAIProvider` and `DemoAVOProvider` implementations. The OpenAI path uses the Responses API, an environment-configurable model name defaulting to `gpt-5.6`, strict structured output, Zod validation, and source-message ID verification. The no-key path is deterministic and visibly labelled.
+
+`SocialPublisher` has `BufferPublisher` and `DemoSocialPublisher` implementations. The verified demo publisher requires approval and protects against duplicate schedules. Live Buffer behavior is not claimed.
+
+The Supabase migration defines the normalized tenant tables, organization RLS, role policies, approval separation, scheduling idempotency, and an audit table without normal update/delete policies. These are deployment artifacts rather than evidence of active UI persistence. See [Architecture](docs/ARCHITECTURE.md) and [P0 acceptance verification](docs/P0_ACCEPTANCE.md).
+
+## Technology
+
+Codex, Next.js App Router, React, TypeScript, OpenAI Responses API adapter, GPT-5.6 model configuration, Zod, Supabase PostgreSQL migration/RLS/SDK tooling, Buffer GraphQL adapter, Demo Publisher, Recharts, ExcelJS, Mammoth, pdf-parse, Papa Parse, Vitest, Playwright, ESLint, and Vercel.
+
+## Local setup
 
 ```bash
 npm install
@@ -31,58 +60,79 @@ copy .env.example .env.local
 npm run dev
 ```
 
-Open `http://localhost:3000`. No credentials are required for the complete simulated demo. Optional service setup is documented in [Deployment](docs/DEPLOYMENT.md).
+Open `http://localhost:3000`. All values in `.env.local` may remain blank for the verified simulated demo. Never commit real credentials.
 
-## Demo accounts
+Optional server-side configuration:
 
-The UI role selector makes the local no-credential demo instant. Seeded Supabase accounts use password `PulseDemo!2026`:
+```text
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-5.6
+BUFFER_API_KEY=
+```
 
-| Account                              | Role              |
-| ------------------------------------ | ----------------- |
-| admin@customerpulse.demo             | Administrator     |
-| sales.manager@customerpulse.demo     | Sales Manager     |
-| marketing.manager@customerpulse.demo | Marketing Manager |
-| account.executive@customerpulse.demo | Account Executive |
-| auditor@customerpulse.demo           | Auditor / Viewer  |
+Supabase variables are used by the reset tooling, not by the current in-memory UI runtime. See [Deployment](docs/DEPLOYMENT.md) before configuring external services.
+
+## Demo roles and optional seeded accounts
+
+The no-credential demo uses the visible **Demo account** selector. If the Supabase reset loader is run against a configured project, it provisions these synthetic users with password `PulseDemo!2026`:
+
+| Account                                | Role              |
+| -------------------------------------- | ----------------- |
+| `admin@customerpulse.demo`             | Administrator     |
+| `sales.manager@customerpulse.demo`     | Sales Manager     |
+| `marketing.manager@customerpulse.demo` | Marketing Manager |
+| `account.executive@customerpulse.demo` | Account Executive |
+| `auditor@customerpulse.demo`           | Auditor / Viewer  |
+
+The current UI does not authenticate against those Supabase users.
 
 ## Mock data and imports
 
-Permanent populated templates and grounding assets live in [`mock-data`](mock-data). They remain after import and are downloadable on Data Imports. `node scripts/reset-demo.mjs --confirm` reloads customer seed data into configured Supabase; `supabase db reset` applies migrations and `seed.sql`. See [Mock Data](docs/MOCK_DATA.md) and [Data Imports](docs/DATA_IMPORTS.md).
+Permanent synthetic fixtures live in [`mock-data`](mock-data) and remain downloadable from Data Imports. They include customer, transaction, conversation, product, campaign-result, grounding-document, and campaign-image files. The fixture set contains 30 customers, all four tiers, transaction dates spanning at least 12 months, multiple channels and product categories, and the evidence needed for Scenarios A–D.
+
+`node scripts/reset-demo.mjs --confirm` is a guarded loader for an explicitly configured Supabase project. `supabase db reset` applies the migration and `supabase/seed.sql` to a disposable local Supabase environment. Neither command removes the permanent mock files. See [Data Imports](docs/DATA_IMPORTS.md) and [Mock Data](docs/MOCK_DATA.md).
 
 ## Demo scenarios
 
-- **A:** Maya Tan, Strategic/Critical, declining purchases, unresolved delivery complaints, a missed commitment, competitor and cancellation language. AVO recommends service recovery before promotion.
-- **B:** Ethan Lim, Growth/Low, positive activity and explicit interest in analytics. AVO drafts a catalogue-grounded cross-sell.
-- **C:** North food-and-beverage segment breaches risk, revenue, frequency and engagement thresholds with shared price objections; a grounded campaign moves through approval and Demo Publisher.
-- **D:** Omar Aziz moves High to Medium after approved recovery, positive response and a new purchase; estimated recovered revenue appears in Analytics.
+- **A — Strategic customer at risk:** Maya Tan has declining activity, two unresolved delivery complaints, negative sentiment, a missed commitment, competitor language, and cancellation language. AVO recommends service recovery before promotion; approval and consent gate the WhatsApp action.
+- **B — Growth opportunity:** Ethan Lim has positive sentiment, strong activity, product interest, and an Analytics Suite gap. AVO creates a catalogue-grounded outreach draft for review.
+- **C — Segment decline:** the synthetic North / Food & beverage segment crosses configured risk, revenue, frequency, engagement, and shared-objection thresholds. Marketing reviews a source-grounded campaign and schedules it through Demo Publisher.
+- **D — Successful recovery:** Omar Aziz has a recorded approved recovery, positive response, new purchase, High-to-Medium risk change, and estimated recovered revenue shown in Analytics.
 
 ## Testing
 
 ```bash
-npm run typecheck
 npm run lint
+npm run typecheck
 npm test
 npm run build
 npx playwright install chromium
 npm run test:e2e
+npm audit
 ```
 
-The verified suite contains 47 unit tests and 9 production-browser workflows covering all permanent imports, Scenarios A-D, approval and consent bypass attempts, RBAC, downloads and audit controls. See [Testing](docs/TESTING.md) and the [P0 acceptance matrix](docs/P0_ACCEPTANCE.md).
+Final verification passed:
 
-## Privacy and AI governance
+- **47/47 unit tests** across imports, tier/churn boundaries, AVO safeguards, workflows, scenarios, publisher behavior, mock data, and required Supabase security structure.
+- **9/9 production-browser workflows** across all routes/RBAC, AVO Chat, all permanent mock imports, Scenarios A–D, approval and consent bypass attempts, downloads, governance, settings, and audit controls.
+- Lint, strict type checking, production build, and dependency audit; the audit reported zero vulnerabilities at verification time.
 
-The platform provides privacy-supporting controls, not regulatory certification. Tenant RLS, purpose limitation, data minimisation, consent enforcement, classification, retention review, AI disclosure, lineage and audited exports are visible. AVO cites source IDs, displays confidence/uncertainty, abstains when evidence is weak and cannot approve or execute. See [AI Governance](docs/AI_GOVERNANCE.md), [Data Governance](docs/DATA_GOVERNANCE.md) and [Privacy](docs/PRIVACY.md).
+See [Testing](docs/TESTING.md) and [Final handoff](docs/FINAL_HANDOFF.md).
 
-## Deployment
+## Privacy, AI governance, and human decisions
 
-The repository is prepared for GitHub, Supabase and Vercel with a health endpoint at `/api/health`, SQL migration/seed, `.env.example`, demo fallback and deployment checklist. See [Deployment](docs/DEPLOYMENT.md) and the [final handoff](docs/FINAL_HANDOFF.md).
+AVO output displays evidence, confidence, uncertainty, and a verification warning. Material recommendations remain drafts until reviewed. Staff may edit drafts; managers approve or reject them; employees explicitly open outreach links or schedule campaigns. AVO cannot approve, execute, change deterministic scores, override consent, invent prices or policies, or publish autonomously.
 
-## Limitations and human decisions
+The Governance screen presents purpose limitation, minimisation, consent, classification, retention review, processing disclosure, data lineage, correction/export/deletion-review requests, and auditability. These are privacy-supporting controls, not a guarantee of compliance with every law. See [AI Governance](docs/AI_GOVERNANCE.md), [Data Governance](docs/DATA_GOVERNANCE.md), and [Privacy](docs/PRIVACY.md).
 
-Live WhatsApp/email ingestion, CRM integrations, paid audiences, model training and autonomous outreach are out of scope. With no credentials, live OpenAI, Buffer, Supabase and Vercel operations are not claimed. The no-credential workflow state is in-memory and resets on reload; production Supabase UI persistence and live two-tenant RLS tests remain deployment work. Employees decide overrides, approvals, messages, offers, exports and publication. AVO never makes final business decisions.
+## How Codex and GPT-5.6 fit
 
-## How Codex and GPT-5.6 are used
+Codex was used to implement and review the application, domain engines, server routes, import parsers, synthetic assets, Supabase schema, test suites, release fixes, and documentation in this development session.
 
-Codex implemented the application, tests, schema, mock artefacts and documentation in this repository. With `OPENAI_API_KEY`, server-side AVO analysis uses the Responses API and the environment-configured `OPENAI_MODEL` (default `gpt-5.6`); outputs are Zod-validated and evidence IDs are checked. Without a key, deterministic `DemoAVOProvider` produces clearly labelled fallback analysis.
+The application’s live AVO adapter targets the OpenAI Responses API with `OPENAI_MODEL=gpt-5.6` by default. Its structured request and validation path are tested, but no external model response is claimed because no API key was available during verification. The verified no-key workflow uses `DemoAVOProvider` and labels its output **AVO Demo Analysis**.
 
-For the three-minute walkthrough, use [Demo Script](docs/DEMO_SCRIPT.md). Devpost notes are in [Devpost Submission](docs/DEVPOST_SUBMISSION.md).
+## Limitations and future development
+
+The current demo resets workflow mutations on reload. Live Supabase Auth/persistence/Storage, two-tenant runtime testing, live GPT-5.6 evaluation, credential-tested Buffer publishing/status/retries, persistent tracking analytics, Realtime, automatic campaign-image processing, AI image generation, live WhatsApp/email ingestion, CRM integration, and autonomous outreach are not implemented or verified. Future development should preserve the existing evidence, consent, authorization, approval, and audit boundaries.
+
+For submission-ready copy, use [Devpost Submission](docs/DEVPOST_SUBMISSION.md). For the walkthrough, use the [under-three-minute Demo Script](docs/DEMO_SCRIPT.md).
