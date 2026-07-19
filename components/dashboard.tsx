@@ -1107,6 +1107,7 @@ function Customer360({
     ).get("tab") ?? "overview";
   const [tab, setTab] = useState(slugTabs[requestedTab] ?? "Overview"),
     [analysis, setAnalysis] = useState<AVOAnalysis | null>(null),
+    [analysisProvider, setAnalysisProvider] = useState(""),
     [loading, setLoading] = useState(false);
   const demo = useDemoWorkflow();
   const openTab = (label: string) => {
@@ -1140,6 +1141,7 @@ function Customer360({
         data = await r.json();
       if (!r.ok) throw new Error(data.error);
       setAnalysis(data.analysis);
+      setAnalysisProvider(data.provider ?? (data.demo ? "AVO Demo Provider" : "Live AVO provider"));
       const rejected = demo.storeAnalysis(c.id, data.analysis);
       if (rejected.length)
         throw new Error(`Invalid evidence IDs: ${rejected.join(", ")}`);
@@ -1147,14 +1149,14 @@ function Customer360({
       workflow.log(
         "Conversation analysis",
         c.id,
-        data.demo ? "AVO Demo Analysis" : "OpenAI analysis",
+        `${data.provider ?? "Unknown provider"}${data.demo ? " · Demo fallback" : " · Live"}`,
       );
       notify(
         data.demo
           ? data.fallbackReason
             ? `AVO Demo fallback used: ${data.fallbackReason}`
             : "AVO Demo Analysis completed"
-          : "Live AVO analysis completed",
+          : `Live AVO analysis completed with ${data.provider}`,
       );
     } catch (e) {
       notify(e instanceof Error ? e.message : "Analysis failed");
@@ -1317,7 +1319,10 @@ function Customer360({
       (item) => item.customerId === c.id,
     );
     body = analysis ? (
-      <AnalysisPanel analysis={analysis} customerId={c.id} notify={notify} />
+      <div>
+        <div className="notice"><strong>Provider:</strong> {analysisProvider}</div>
+        <AnalysisPanel analysis={analysis} customerId={c.id} notify={notify} />
+      </div>
     ) : storedAnalysis ? (
       <div>
         <div className="notice">Stored validated AVO analysis</div>
@@ -1618,6 +1623,7 @@ function Conversations({
     [owner, setOwner] = useState("All");
   const [analysis, setAnalysis] = useState<AVOAnalysis | null>(null);
   const [analysisMode, setAnalysisMode] = useState<"demo" | "live" | "">("");
+  const [analysisProvider, setAnalysisProvider] = useState("");
   const [loading, setLoading] = useState(false);
   const workflow = useWorkflow();
   const filtered = eligible.filter(
@@ -1647,20 +1653,21 @@ function Conversations({
       if (!r.ok) throw new Error(data.error);
       setAnalysis(data.analysis);
       setAnalysisMode(data.demo ? "demo" : "live");
+      setAnalysisProvider(data.provider ?? (data.demo ? "AVO Demo Provider" : "Live AVO provider"));
       const rejected = demo.storeAnalysis(selected.id, data.analysis);
       if (rejected.length)
         throw new Error(`Invalid evidence IDs: ${rejected.join(", ")}`);
       workflow.log(
         "Conversation analysis",
         selected.id,
-        data.demo ? "AVO Demo Analysis" : "OpenAI analysis",
+        `${data.provider ?? "Unknown provider"}${data.demo ? " · Demo fallback" : " · Live"}`,
       );
       notify(
         data.demo
           ? data.fallbackReason
             ? `AVO Demo fallback used: ${data.fallbackReason}`
             : "AVO Demo Analysis completed — fallback clearly labelled"
-          : "AVO analysis completed with configured model",
+          : `AVO analysis completed with ${data.provider}`,
       );
     } catch (e) {
       notify(e instanceof Error ? e.message : "Analysis failed");
@@ -1738,6 +1745,7 @@ function Conversations({
                 setSelected(c);
                 setAnalysis(null);
                 setAnalysisMode("");
+                setAnalysisProvider("");
               }}
             >
               <div className="split">
@@ -1818,7 +1826,7 @@ function Conversations({
       <div className="card">
         <div className="card-head">
           <h2>AVO Analysis</h2>
-          {analysis && <span className="demo-label">{analysisMode === "demo" ? "AVO Demo fallback" : "Live AVO provider"}</span>}
+          {analysis && <span className="demo-label">{analysisMode === "demo" ? `${analysisProvider} · fallback` : `${analysisProvider} · live`}</span>}
         </div>
         {!analysis ? (
           <div className="empty">
