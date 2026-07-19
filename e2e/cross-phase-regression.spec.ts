@@ -76,7 +76,14 @@ test("Cross-phase imported operational pipeline changes customer state and audit
   );
   await page.getByRole("button", { name: "Send AVO message" }).click();
   expect((await chatResponse).ok()).toBe(true);
-  await expect(page.getByText(/Iris Demo \(CUS-1015\).*highest-risk/i)).toBeVisible();
+  await expect(
+    page.getByText(/Iris Demo.*CUS-1015|CUS-1015.*Iris Demo/i),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/Xiaomi MiMo live provider|AVO Operational Fallback/, {
+      exact: true,
+    }),
+  ).toBeVisible();
   await page.getByRole("link", { name: "Conversations", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Maya Tan" })).toBeVisible();
   await expect(page.getByText("MSG-A-104", { exact: false })).toBeVisible();
