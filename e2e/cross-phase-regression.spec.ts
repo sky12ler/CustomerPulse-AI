@@ -4,10 +4,21 @@ import path from "node:path";
 const mock = (name: string) => path.join(process.cwd(), "mock-data", name);
 
 async function reset(page: Page, route = "/imports") {
+  const productionBase = process.env.PLAYWRIGHT_BASE_URL ?? "";
+  const email = process.env.E2E_SUPABASE_ADMIN_EMAIL;
+  const password = process.env.E2E_SUPABASE_ADMIN_PASSWORD;
+  if (productionBase.startsWith("https://") && email && password) {
+    await page.goto("/login");
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Password").fill(password);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.waitForURL(/\/overview/);
+  }
   await page.goto(route);
   await page.evaluate(() => localStorage.removeItem("customerpulse-demo-v2"));
   await page.reload();
-  await page.getByLabel("Demo account").selectOption("Administrator");
+  const role = page.getByLabel("Demo account");
+  if (await role.isEnabled()) await role.selectOption("Administrator");
 }
 
 async function importFile(page: Page, kind: string, filename: string) {

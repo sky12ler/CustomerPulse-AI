@@ -51,9 +51,13 @@ Local schema tests verify the migration text and access invariants. Remote persi
 After deployment:
 
 ```powershell
+$env:E2E_SUPABASE_ADMIN_EMAIL='<test administrator email>'
+$env:E2E_SUPABASE_ADMIN_PASSWORD='<test administrator password>'
 $env:PLAYWRIGHT_BASE_URL='https://customer-pulse-ai-eight.vercel.app'
 npx playwright test --workers=1
 ```
+
+The two test credentials remain local shell variables; do not commit them or add them to Vercel. The authenticated administrator is used only by the Imported Workspace cross-phase test. Without them, that production test must and does receive 401 from imported AVO.
 
 The deployed regression is not reported as 45/45: the imported AVO test requires a real Supabase Auth session. Its unauthenticated 401 is a security success, but not evidence of the authenticated workflow.
 
