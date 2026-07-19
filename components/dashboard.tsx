@@ -45,6 +45,7 @@ import {
   trendChart,
 } from "@/lib/demo-data";
 import type { AVOAnalysis } from "@/lib/avo";
+import type { AvoChatContext } from "@/lib/avo-chat";
 import type { Customer, Role } from "@/lib/types";
 import type { ImportResult } from "@/lib/imports";
 import {
@@ -2724,35 +2725,105 @@ function ImportHistory() {
 }
 
 function AVOChat({ notify }: { notify: (s: string) => void }) {
+  const demo = useDemoWorkflow();
   const suggestions = [
+    "Who is the highest-risk customer?",
     "Which Strategic customers are at risk?",
-    "Why is Maya Tan Critical Risk?",
     "Which segment has the greatest decline?",
     "What actions await my approval?",
   ];
-  const [chat, setChat] = useState<{ from: string; text: string }[]>([
+  const [chat, setChat] = useState<
+    { from: "user" | "avo"; text: string; provider?: string }[]
+  >([
     {
       from: "avo",
-      text: "Hello, I’m AVO. I can explain customer evidence and create drafts, but I cannot approve or execute actions.",
+      text: "Hello, I’m AVO. Ask me a normal question about customers, risks, evidence, approvals or opportunities in the active workspace.",
+      provider: "AVO",
     },
   ]);
   const [input, setInput] = useState("");
-  const send = (q = input) => {
+  const [loading, setLoading] = useState(false);
+  const send = async (q = input) => {
     if (!q.trim()) return;
-    const answer = q.includes("Maya")
-      ? "Maya Tan (CUS-1001) has a deterministic risk score of 86. The strongest sources are MSG-A-101 (unresolved delivery), MSG-A-103 (missed follow-up and competitor mention), and MSG-A-104 (cancellation language). This suggests elevated risk; it does not confirm future churn."
-      : q.includes("segment")
-        ? "Food & beverage / North shows a 24% frequency decline, 18% revenue decline and repeated price objections across 33% of the segment. Review Marketing Trigger MKT-003."
-        : q.includes("approval")
-          ? "Four items await review: two retention actions and two campaigns. I can open or summarize them, but only an authorised manager can decide."
-          : "I found relevant synthetic records, but there is insufficient evidence for a firm conclusion—staff review required.";
-    setChat((x) => [
-      ...x,
-      { from: "user", text: q },
-      { from: "avo", text: answer },
-    ]);
+    const history = [...chat, { from: "user" as const, text: q }];
+    setChat(history);
     setInput("");
-    notify("AVO answer grounded to authorised demo records");
+    setLoading(true);
+    const accessibleCustomerIds = new Set(
+      demo.accessibleCustomers.map((customer) => customer.id),
+    );
+    const context: AvoChatContext = {
+      workspace: demo.state.activeWorkspace,
+      role: demo.state.role,
+      customers: demo.accessibleCustomers.map((customer) => ({
+        id: customer.id,
+        name: customer.name,
+        company: customer.company,
+        tier: customer.tier,
+        risk: customer.risk,
+        riskScore: customer.riskScore,
+        revenueAtRisk: customer.revenueAtRisk,
+        staff: customer.staff,
+        sentiment: customer.sentiment,
+      })),
+      alerts: demo.dataset.alerts
+        .filter((alert) => accessibleCustomerIds.has(alert.customerId))
+        .map((alert) => ({
+          id: alert.id,
+          customerId: alert.customerId,
+          status: alert.status,
+          trigger: alert.trigger,
+          currentRisk: alert.currentRisk,
+        })),
+      actions: demo.accessibleActions.map((action) => ({
+        id: action.id,
+        customerId: action.customerId,
+        customer: action.customerName,
+        status: action.status,
+        owner: action.owner,
+        action: action.recommendation,
+      })),
+      campaigns: demo.state.campaigns
+        .filter((campaign) => campaign.datasetId === demo.state.activeWorkspace)
+        .map((campaign) => ({ id: campaign.id, name: campaign.name, status: campaign.status })),
+      opportunities: demo.state.marketingOpportunities
+        .filter((item) => item.datasetId === demo.state.activeWorkspace)
+        .map((item) => ({
+          id: item.id,
+          title: item.title,
+          affectedPercentage: item.affectedPercentage,
+          confidence: item.confidence,
+        })),
+    };
+    try {
+      const response = await fetch("/api/avo/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: q, history, context }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "AVO chat failed");
+      setChat((current) => [
+        ...current,
+        { from: "avo", text: data.answer, provider: data.provider },
+      ]);
+      notify(
+        data.demo && data.fallbackReason
+          ? `AVO operational fallback used: ${data.fallbackReason}`
+          : `AVO answered with ${data.provider}`,
+      );
+    } catch (error) {
+      setChat((current) => [
+        ...current,
+        {
+          from: "avo",
+          text: error instanceof Error ? error.message : "AVO chat failed",
+          provider: "Error",
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
   };
   return (
     <div className="grid two">
@@ -2768,12 +2839,12 @@ function AVOChat({ notify }: { notify: (s: string) => void }) {
               key={i}
             >
               <strong style={{ fontSize: 10 }}>
-                {m.from === "avo" ? "AVO Demo Analysis" : "You"}
+                {m.from === "avo" ? m.provider ?? "AVO" : "You"}
               </strong>
               <div>{m.text}</div>
               {m.from === "avo" && i > 0 && (
                 <div className="message-meta">
-                  Evidence links included · uncertainty stated
+                  Grounded to the active accessible workspace
                 </div>
               )}
             </div>
@@ -2784,10 +2855,10 @@ function AVOChat({ notify }: { notify: (s: string) => void }) {
             className="input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && send()}
+            onKeyDown={(e) => e.key === "Enter" && void send()}
             placeholder="Ask AVO about accessible customers, evidence or approvals"
           />
-          <button className="btn btn-primary" onClick={() => send()}>
+          <button aria-label="Send AVO message" className="btn btn-primary" disabled={loading} onClick={() => void send()}>
             <Send size={14} />
           </button>
         </div>
@@ -2805,7 +2876,7 @@ function AVOChat({ notify }: { notify: (s: string) => void }) {
               justifyContent: "space-between",
               marginBottom: 8,
             }}
-            onClick={() => send(s)}
+            onClick={() => void send(s)}
           >
             {s}
             <ChevronRight size={13} />
@@ -2839,7 +2910,7 @@ function Governance({ notify }: { notify: (s: string) => void }) {
     ],
     [
       "Organisation isolation",
-      "Supabase RLS policies scope records by organisation and role.",
+      "Imported records stay isolated in this browser; walkthrough roles scope visible records.",
       Users,
     ],
     [

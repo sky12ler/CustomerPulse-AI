@@ -67,6 +67,16 @@ test("Cross-phase imported operational pipeline changes customer state and audit
 
   await page.getByRole("link", { name: "Data Imports" }).click();
   await importFile(page, "conversations", "conversations.csv");
+  await page.getByRole("button", { name: "Ask AVO" }).click();
+  await page
+    .getByPlaceholder("Ask AVO about accessible customers, evidence or approvals")
+    .fill("Who is the highest-risk customer?");
+  const chatResponse = page.waitForResponse((response) =>
+    response.url().includes("/api/avo/chat"),
+  );
+  await page.getByRole("button", { name: "Send AVO message" }).click();
+  expect((await chatResponse).ok()).toBe(true);
+  await expect(page.getByText(/Iris Demo \(CUS-1015\).*highest-risk/i)).toBeVisible();
   await page.getByRole("link", { name: "Conversations", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Maya Tan" })).toBeVisible();
   await expect(page.getByText("MSG-A-104", { exact: false })).toBeVisible();

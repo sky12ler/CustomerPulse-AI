@@ -66,6 +66,11 @@ export class DemoAVOProvider implements AIProvider {
         short_explanation: m.text.slice(0, 110),
       }));
     const insufficient = evidence.length === 0;
+    const evidenceConfidence = insufficient
+      ? 0.35
+      : evidence.length >= 3
+        ? 0.85
+        : Math.max(0.6, c.confidence / 100);
     return {
       demo: true,
       analysis: {
@@ -121,7 +126,7 @@ export class DemoAVOProvider implements AIProvider {
           c.scenario === "A" || missedFollowUp ? ["Promised update appears missed"] : [],
         recommended_tags: [c.risk.toLowerCase(), c.sentiment.toLowerCase()],
         evidence,
-        analysis_confidence: insufficient ? 0.35 : c.confidence / 100,
+        analysis_confidence: evidenceConfidence,
         uncertainty_reason: insufficient
           ? "No eligible source evidence was found."
           : "Intent and future behaviour remain inferences; staff verification is required.",

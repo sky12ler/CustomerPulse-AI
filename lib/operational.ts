@@ -828,6 +828,7 @@ export function commitOperationalImport(
         channel: ["Email", "Support chat"].includes(str(row.channel))
           ? (str(row.channel) as "Email" | "Support chat")
           : "WhatsApp",
+        evidence: true,
       };
       const old = customer.messages.find((item) => item.id === id);
       if (!old) added++;

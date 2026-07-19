@@ -1,6 +1,6 @@
 # Testing
 
-Final regression date: 19 July 2026 (Asia/Kuala Lumpur).
+Final regression date: 20 July 2026 (Asia/Kuala Lumpur).
 
 ## Commands
 
@@ -21,9 +21,9 @@ npm audit --audit-level=low
 | --- | --- |
 | ESLint | Passed, zero errors |
 | TypeScript | Passed with `tsc --noEmit` |
-| Vitest | 14 files, 119/119 passed |
+| Vitest | 16 files, 123/123 passed |
 | Local production build | Passed |
-| Local Playwright | 45/45 passed against the optimized production server in 35.3 seconds |
+| Local Playwright | 45/45 passed against the optimized production server in 43.7 seconds |
 | MiMo endpoint | Connected; `mimo-v2.5` returned model output |
 | npm audit | 0 vulnerabilities at `--audit-level=low` |
 | Secret scan | Passed; `.env.local` ignored/untracked, no credential/private-key match (one known synthetic env assignment in an AVO unit test) |
@@ -34,7 +34,7 @@ This table is intentionally conservative and is updated only after each command 
 
 ## Coverage
 
-The 119 unit tests cover import parsers and mock files, connected scenario fixtures, tier/churn/ERAR calculations, evidence validation, prompt-injection stripping, operational mutation, alert idempotency, action transition rules, consent, publisher gates, calculated marketing opportunities/audiences, per-entity persistence merge/serialization and optional Supabase schema structure.
+The 123 unit tests cover import parsers and mock files, the ordered mixed-risk scenario pipeline, tier/churn/ERAR calculations, imported-evidence validation, contextual AVO chat answers, prompt-injection stripping, operational mutation, alert idempotency, action transition rules, consent, publisher gates, calculated marketing opportunities/audiences, per-entity persistence merge/serialization and optional Supabase schema structure.
 
 The 45 browser workflows cover Imported Workspace import/recalculation, Customers and Customer 360 navigation/access/filter/sort/pagination/export/mobile behavior, Maya’s complete retention workflow, campaign creation/approval/calendar, Omar’s outcome recalculation, guided scenarios and audit chains.
 
