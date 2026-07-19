@@ -34,7 +34,7 @@ Verification date: 19 July 2026. “Verified” below means covered by an observ
 - Production build: passed.
 - Playwright: 45/45 passed against the optimized local production server.
 - MiMo: minimal OpenAI-compatible request succeeded with `mimo-v2.5`; browser Scenario B also completed the AVO route during regression.
-- npm audit: 0 vulnerabilities at low threshold. Secret scan passed with `.env.local` ignored and untracked. The browser-local Imported Workspace change must be redeployed before the Vercel regression is rerun.
+- npm audit: 0 vulnerabilities at low threshold. Secret scan passed with `.env.local` ignored and untracked. The public Vercel regression passed 45/45, including the no-login Imported Workspace AVO pipeline.
 
 ## Manual production prerequisites
 

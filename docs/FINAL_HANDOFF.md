@@ -5,8 +5,8 @@ Verification date: 19 July 2026 (Asia/Kuala Lumpur).
 ## Release reference
 
 - Production URL: https://customer-pulse-ai-eight.vercel.app
-- Application commit: `d6da5abb886dd12b206c0d25b74284d9f513972d`
-- Vercel deployment: `dpl_6MqwibC3xoubFfs8gAKmfHzqE4mg` (`READY`, production)
+- Application commit: `6d3cee5de4d7e0a31872dd5f050b7ca976443960`
+- Vercel deployment: `dpl_D4ieQXtvfYqQ4g8bLfLMeQkgJ2ri` (`READY`, production)
 - Local MiMo connection: verified against the configured OpenAI-compatible endpoint with model `mimo-v2.5`
 - Imported Workspace mode: browser-local by product decision; no login or shared anonymous Supabase access
 
@@ -53,7 +53,7 @@ Verification date: 19 July 2026 (Asia/Kuala Lumpur).
 | Xiaomi MiMo endpoint | Connected; `mimo-v2.5` returned output |
 | npm audit | 0 vulnerabilities at `--audit-level=low` |
 | Secret scan | Passed; `.env.local` ignored/untracked and no real credential/private-key match |
-| Vercel production regression | Previous deployment passed 44/45; the imported AVO login requirement is removed in the pending release and must be rerun |
+| Vercel production regression | 45/45 passed against the public production URL in 1.4 minutes |
 | Production MiMo AVO | Explicit Demo fallback observed: Xiaomi attempt returned `401 Invalid API Key`; Vercel credentials/base URL need manual update |
 
 ## Required environment variables
@@ -84,7 +84,7 @@ No database or Auth account is required for the selected hackathon workflow. Mig
 
 1. Push the final commit to GitHub.
 2. Confirm all environment variables exist for Production in Vercel.
-3. Redeploy the production branch. Deployment `dpl_6MqwibC3xoubFfs8gAKmfHzqE4mg` currently serves the release.
+3. Redeploy the production branch. Deployment `dpl_D4ieQXtvfYqQ4g8bLfLMeQkgJ2ri` currently serves the release.
 4. Check `/api/health`; “configured” means credentials exist, while a completed AVO response proves live use.
 5. Select Imported Workspace, import the connected scenario pack and refresh in the same browser.
 6. Run the 45-test Playwright regression against the production URL and record any environment-only failures honestly.
