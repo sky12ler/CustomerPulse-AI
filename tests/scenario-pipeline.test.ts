@@ -111,5 +111,12 @@ describe("mixed-risk Imported Workspace pipeline", () => {
     expect(
       analysed.dataset.customers.find((item) => item.id === alicia.id),
     ).toMatchObject({ risk: "Critical", riskScore: 100 });
+    const emil = conversations.dataset.customers.find(
+      (item) => item.id === "IMP-QUIET-005",
+    )!;
+    const quietAnalysis = await new DemoAVOProvider().analyze(emil);
+    expect(quietAnalysis.analysis.analysis_confidence).toBe(0.45);
+    expect(quietAnalysis.analysis.complaints).toEqual([]);
+    expect(quietAnalysis.analysis.cancellation_signals).toEqual([]);
   });
 });

@@ -46,13 +46,22 @@ export class DemoAVOProvider implements AIProvider {
   name = "AVO Demo Provider";
   async analyze(c: Customer) {
     const corpus = c.messages.map((message) => message.text).join(" ");
-    const serviceIssue = /complaint|late|replacement|unresolved|issue/i.test(corpus);
+    const serviceIssue =
+      /complaint|\blate\b|replacement|unresolved|\bissue\b/i.test(corpus);
     const cancellation = /\bcancel|leave|churn/i.test(corpus);
     const competitor = /competitor/i.test(corpus);
     const missedFollowUp = /passed with no update|missed|no update/i.test(corpus);
     const priceObjection = /price|expensive|value.+justify|difficult to justify/i.test(corpus);
     const productInterest = /analytics|product|approved .+ option|show us/i.test(corpus);
     const recovery = /issue is resolved|resolved.+order|next order/i.test(corpus);
+    const relevantFinding =
+      serviceIssue ||
+      cancellation ||
+      competitor ||
+      missedFollowUp ||
+      priceObjection ||
+      productInterest ||
+      recovery;
     const evidence = c.messages
       .filter((m) => m.evidence)
       .map((m) => ({
@@ -71,6 +80,8 @@ export class DemoAVOProvider implements AIProvider {
       ? 0.35
       : evidence.length >= 3
         ? 0.85
+        : !relevantFinding
+          ? 0.45
         : Math.max(0.6, c.confidence / 100);
     return {
       demo: true,
