@@ -5,10 +5,10 @@ Verification date: 19 July 2026 (Asia/Kuala Lumpur).
 ## Release reference
 
 - Production URL: https://customer-pulse-ai-eight.vercel.app
-- Final application commit: recorded after the final push
-- Final Vercel deployment: recorded after the final deployment
+- Application commit: `d6da5abb886dd12b206c0d25b74284d9f513972d`
+- Vercel deployment: `dpl_6MqwibC3xoubFfs8gAKmfHzqE4mg` (`READY`, production)
 - Local MiMo connection: verified against the configured OpenAI-compatible endpoint with model `mimo-v2.5`
-- Supabase runtime: code complete; migration 003 and role assignment must be applied to the linked project before remote persistence can be claimed production-verified
+- Supabase runtime: migration 003 was applied by the project owner; Auth users and roles remain required before authenticated persistence can be production-verified
 
 ## Problems found during the user walkthrough and resolution
 
@@ -54,7 +54,8 @@ Verification date: 19 July 2026 (Asia/Kuala Lumpur).
 | Xiaomi MiMo endpoint | Connected; `mimo-v2.5` returned output |
 | npm audit | 0 vulnerabilities at `--audit-level=low` |
 | Secret scan | Passed; `.env.local` ignored/untracked and no real credential/private-key match |
-| Vercel production regression | Must be rerun after final deployment; no result is pre-claimed |
+| Vercel production regression | 44/45 passed; the only failure was the expected 401 for an unauthenticated Imported Workspace AVO test |
+| Production MiMo AVO | Explicit Demo fallback observed: Xiaomi attempt returned `401 Invalid API Key`; Vercel credentials/base URL need manual update |
 
 ## Required environment variables
 
@@ -98,7 +99,7 @@ Next, create accounts at `/login`. New sign-ups default to Account Executive. Fo
 
 1. Push the final commit to GitHub.
 2. Confirm all environment variables exist for Production in Vercel.
-3. Redeploy the production branch.
+3. Redeploy the production branch. Deployment `dpl_6MqwibC3xoubFfs8gAKmfHzqE4mg` currently serves the release.
 4. Check `/api/health`; “configured” means credentials exist, while a completed AVO response proves live use.
 5. Sign in, select Imported Workspace, import the connected scenario pack and refresh in a second session.
 6. Run the 45-test Playwright regression against the production URL and record any environment-only failures honestly.
@@ -122,5 +123,5 @@ Supabase users are project-specific. Create them through `/login`; use `ROLE_SET
 - Demo Publisher is an in-app simulator, not social delivery.
 - WhatsApp/email are user-initiated links or staff-confirmed transitions; delivery and inbound responses are not integrated.
 - Image generation/advanced image processing and CRM sync are not implemented.
-- Supabase production behavior cannot be claimed until migration 003, user roles and the deployed regression are completed on the linked project.
+- Supabase authenticated persistence cannot be claimed until Auth users/roles exist and the imported AVO regression is rerun with a real bearer session.
 - MiMo can still fail because of provider quota, model access or endpoint availability; the application reports the fallback instead of hiding it.

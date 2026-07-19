@@ -34,11 +34,11 @@ Verification date: 19 July 2026. “Verified” below means covered by an observ
 - Production build: passed.
 - Playwright: 45/45 passed against the optimized local production server.
 - MiMo: minimal OpenAI-compatible request succeeded with `mimo-v2.5`; browser Scenario B also completed the AVO route during regression.
-- npm audit: 0 vulnerabilities at low threshold. Secret scan passed with `.env.local` ignored and untracked. Deployed Vercel regression remains pending the final deployment.
+- npm audit: 0 vulnerabilities at low threshold. Secret scan passed with `.env.local` ignored and untracked. Vercel regression passed 44/45; authenticated Imported Workspace AVO remains pending a real Auth user and returned the expected unauthenticated 401.
 
 ## Manual production prerequisites
 
-- Apply `202607190003_operational_workspace.sql` to the linked Supabase project.
+- `202607190003_operational_workspace.sql` was applied by the project owner on 19 July 2026.
 - Create Auth accounts and assign elevated roles with `supabase/ROLE_SETUP.sql`.
 - Push and redeploy to Vercel.
 - Run the production browser regression. Until then, local success is not described as production success.

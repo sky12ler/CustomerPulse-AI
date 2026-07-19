@@ -27,7 +27,8 @@ npm audit --audit-level=low
 | MiMo endpoint | Connected; `mimo-v2.5` returned model output |
 | npm audit | 0 vulnerabilities at `--audit-level=low` |
 | Secret scan | Passed; `.env.local` ignored/untracked, no credential/private-key match (one known synthetic env assignment in an AVO unit test) |
-| Vercel production Playwright | Pending final push/deployment |
+| Vercel production Playwright | 44/45 passed in 1.4 minutes; unauthenticated Imported Workspace AVO correctly returned 401 |
+| Production MiMo request | Xiaomi attempted, then explicit Demo fallback; provider returned `401 Invalid API Key` |
 
 This table is intentionally conservative and is updated only after each command completes.
 
@@ -54,7 +55,7 @@ $env:PLAYWRIGHT_BASE_URL='https://customer-pulse-ai-eight.vercel.app'
 npx playwright test --workers=1
 ```
 
-Production is not marked passed from local evidence alone.
+The deployed regression is not reported as 45/45: the imported AVO test requires a real Supabase Auth session. Its unauthenticated 401 is a security success, but not evidence of the authenticated workflow.
 
 ## Secret scan scope
 
