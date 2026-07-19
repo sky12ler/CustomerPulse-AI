@@ -127,10 +127,20 @@ function RecommendationDetail({
   const customer =
     demo.accessibleCustomers.find((item) => item.id === rec.customerId) ??
     customers.find((item) => item.id === rec.customerId)!;
+  const firstName = customer.name.split(" ")[0];
+  const initialDraft = rec.action.toLowerCase().includes("service")
+    ? `Hi ${firstName}, I’m reviewing the service concerns you raised and will confirm the next approved step after staff review.`
+    : rec.action.toLowerCase().includes("product") ||
+        rec.action.toLowerCase().includes("catalogue")
+      ? `Hi ${firstName}, I can arrange a staff-led review of the approved product information relevant to your enquiry.`
+      : rec.action.toLowerCase().includes("value") ||
+          rec.action.toLowerCase().includes("price")
+        ? `Hi ${firstName}, I can arrange a staff-led review of your current package and the approved value information.`
+        : `Hi ${firstName}, I’m following up on your account and will confirm the next approved step after staff review.`;
   const [draft, setDraft] = useState(
     customer.scenario === "A"
       ? "Hi Maya, I’m sorry our promised update was missed. I’m reviewing the replacement status under our service policy and will confirm the next step after manager approval."
-      : "Hi Ethan, I can share the approved Analytics Suite overview if helpful.",
+      : initialDraft,
   );
   const [owner, setOwner] = useState(rec.owner);
   const [deadline, setDeadline] = useState(
@@ -139,7 +149,9 @@ function RecommendationDetail({
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
   const linked = demo.state.actions.find(
-    (item) => item.recommendationId === rec.id,
+    (item) =>
+      item.datasetId === demo.state.activeWorkspace &&
+      item.recommendationId === rec.id,
   );
   const status = demo.state.recommendationStatuses[rec.id] ?? rec.status;
   const submit = () => {
@@ -148,11 +160,10 @@ function RecommendationDetail({
       !owner.trim() ||
       !deadline ||
       !draft.trim() ||
-      !rec.evidenceIds.length ||
-      !linked?.approver
+      !rec.evidenceIds.length
     )
       return setError(
-        "Owner, deadline, message draft, evidence and approver are required.",
+        "Owner, deadline, message draft and evidence are required. The Sales Manager approver is assigned automatically.",
       );
     try {
       const action = demo.submitRecommendation(rec.id, draft, owner, deadline);

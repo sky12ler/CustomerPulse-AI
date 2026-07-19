@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { deterministicChatAnswer, type AvoChatContext } from "@/lib/avo-chat";
+import {
+  cleanChatText,
+  deterministicChatAnswer,
+  type AvoChatContext,
+} from "@/lib/avo-chat";
 
 const context: AvoChatContext = {
   workspace: "imported",
@@ -22,5 +26,10 @@ describe("AVO operational chat fallback", () => {
   it("summarizes approvals and opportunities", () => {
     expect(deterministicChatAnswer("What awaits approval?", context)).toContain("1 retention action");
     expect(deterministicChatAnswer("Which segment is declining?", context)).toContain("West decline (MKT-1)");
+  });
+  it("removes raw Markdown emphasis from live chat text", () => {
+    expect(cleanChatText("**Alicia** has ***high risk*** and `C-1`.")).toBe(
+      "Alicia has high risk and C-1.",
+    );
   });
 });

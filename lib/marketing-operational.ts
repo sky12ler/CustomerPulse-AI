@@ -95,6 +95,7 @@ export function calculateMarketingOpportunities(
         revenueDecline,
         frequencyDecline,
         engagementDecline,
+        thresholds,
       );
       if (!detection.triggered) return null;
 

@@ -550,9 +550,9 @@ export function DemoWorkflowProvider({
               ? `Offer a staff-led review of ${customer.productGap} using the approved catalogue`
               : "Complete an evidence-led customer follow-up";
       const stableSeedId =
-        customerId === "CUS-1001"
+        state.activeWorkspace === "demo" && customerId === "CUS-1001"
           ? "REC-001"
-          : customerId === "CUS-1002"
+          : state.activeWorkspace === "demo" && customerId === "CUS-1002"
             ? "REC-002"
             : undefined;
       const id =
@@ -620,7 +620,9 @@ export function DemoWorkflowProvider({
       deadline: string,
     ) => {
       let existing = state.actions.find(
-        (item) => item.recommendationId === recommendationId,
+        (item) =>
+          item.datasetId === state.activeWorkspace &&
+          item.recommendationId === recommendationId,
       );
       const recommendation = state.recommendations.find(
         (item) => item.id === recommendationId,

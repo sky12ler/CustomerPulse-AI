@@ -67,4 +67,16 @@ describe("operational Marketing Intelligence", () => {
     };
     expect(calculateMarketingOpportunities(changed, thresholds, dismissed).find((item) => item.id === "MKT-003")?.status).toBe("Active");
   });
+
+  it("uses configured opportunity trigger thresholds", () => {
+    const dataset = createDataset("demo", customers);
+    expect(
+      calculateMarketingOpportunities(dataset, {
+        riskSegment: 101,
+        revenue: 101,
+        frequency: 101,
+        engagement: 101,
+      }),
+    ).toEqual([]);
+  });
 });

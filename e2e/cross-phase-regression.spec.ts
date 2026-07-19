@@ -46,6 +46,7 @@ const revenue = (page: Page) =>
 test("Cross-phase imported operational pipeline changes customer state and audit", async ({
   page,
 }) => {
+  test.setTimeout(90_000);
   await reset(page);
   await importFile(page, "customers", "customers.csv");
   await expect(page.getByLabel("Active workspace")).toHaveValue("imported");
@@ -94,7 +95,21 @@ test("Cross-phase imported operational pipeline changes customer state and audit
   await page.getByRole("button", { name: "Run AVO Analysis" }).click();
   expect((await analysed).ok()).toBe(true);
   await expect(page.getByText("Uncertainty", { exact: true })).toBeVisible();
-  await page.getByRole("link", { name: "View Customer" }).click();
+  await page
+    .getByRole("button", { name: "Generate AVO Recommendation" })
+    .click();
+  await page.getByRole("link", { name: "Recommendations", exact: true }).click();
+  await expect(page.getByLabel("Recommendation owner")).not.toHaveValue("");
+  await expect(page.getByLabel("Recommendation deadline")).not.toHaveValue("");
+  await expect(page.getByLabel("Recommendation message draft")).toHaveValue(
+    /Maya/,
+  );
+  await page.getByRole("button", { name: "Submit for Approval" }).click();
+  await expect(page.locator(".success-panel")).toContainText(
+    "submitted to Sales Manager",
+  );
+  await page.getByRole("button", { name: "Return to Recommendations" }).click();
+  await page.getByRole("button", { name: "View Customer" }).click();
   const analysedScore = await score(page).innerText();
   expect(analysedScore).toMatch(/\d+\/100/);
   const stored = await page.evaluate(() =>

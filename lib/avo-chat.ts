@@ -43,6 +43,16 @@ const money = (value: number) =>
     maximumFractionDigits: 0,
   }).format(value);
 
+export function cleanChatText(value: string): string {
+  return value
+    .replace(/\*{2,3}([^*\n]+)\*{2,3}/g, "$1")
+    .replace(/_{2,3}([^_\n]+)_{2,3}/g, "$1")
+    .replace(/`([^`\n]+)`/g, "$1")
+    .replace(/^\s*\*+\s+/gm, "- ")
+    .replace(/^#{1,6}\s+/gm, "")
+    .trim();
+}
+
 export function deterministicChatAnswer(
   question: string,
   context: AvoChatContext,

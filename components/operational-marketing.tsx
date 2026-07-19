@@ -66,6 +66,16 @@ export function OperationalMarketing({
           imports, AVO analyses, customer responses, and outcomes. No insight is
           displayed when the configured thresholds are not met.
         </p>
+        <div className="notice">
+          <b>Current trigger criteria:</b> at least four customers in the same
+          Region + Industry segment, then any one of: affected customers ≥{" "}
+          {demo.state.thresholds.riskSegment}%, revenue decline ≥{" "}
+          {demo.state.thresholds.revenue}%, mean purchase-frequency decline ≥{" "}
+          {demo.state.thresholds.frequency}%, or engagement decline ≥{" "}
+          {demo.state.thresholds.engagement}%. A customer is affected when they
+          are High/Critical risk or cross a configured frequency, spending, or
+          engagement threshold.
+        </div>
         <div className="filter-row">
           <label className="field">
             Region

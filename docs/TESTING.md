@@ -21,7 +21,7 @@ npm audit --audit-level=low
 | --- | --- |
 | ESLint | Passed, zero errors |
 | TypeScript | Passed with `tsc --noEmit` |
-| Vitest | 16 files, 125/125 passed |
+| Vitest | 16 files, 127/127 passed |
 | Local production build | Passed |
 | Local Playwright | 45/45 passed against the optimized production server in 43.7 seconds |
 | MiMo endpoint | Connected; `mimo-v2.5-pro` returned model output |
@@ -34,7 +34,7 @@ This table is intentionally conservative and is updated only after each command 
 
 ## Coverage
 
-The 125 unit tests cover import parsers and mock files, the ordered mixed-risk scenario pipeline, tier/churn/ERAR calculations, imported-evidence validation, contextual AVO chat answers, MiMo JSON compatibility, prompt-injection stripping, operational mutation, alert idempotency, action transition rules, consent, publisher gates, calculated marketing opportunities/audiences, per-entity persistence merge/serialization and optional Supabase schema structure.
+The 127 unit tests cover import parsers and mock files, the ordered mixed-risk scenario pipeline, tier/churn/ERAR calculations, imported-evidence validation, contextual AVO chat answers and Markdown cleanup, MiMo JSON compatibility, prompt-injection stripping, operational mutation, alert idempotency, action transition rules, consent, publisher gates, configurable calculated marketing opportunities/audiences, per-entity persistence merge/serialization and optional Supabase schema structure.
 
 The 45 browser workflows cover Imported Workspace import/recalculation, Customers and Customer 360 navigation/access/filter/sort/pagination/export/mobile behavior, Maya’s complete retention workflow, campaign creation/approval/calendar, Omar’s outcome recalculation, guided scenarios and audit chains.
 

@@ -122,20 +122,26 @@ export function detectSegmentDecline(
   revenueDecline: number,
   frequencyDecline: number,
   engagementDecline: number,
+  thresholds = {
+    riskSegment: 20,
+    revenue: 15,
+    frequency: 20,
+    engagement: 25,
+  },
 ) {
   const pct = total ? (affected / total) * 100 : 0;
   return {
     triggered:
-      pct >= 20 ||
-      revenueDecline >= 15 ||
-      frequencyDecline >= 20 ||
-      engagementDecline >= 25,
+      pct >= thresholds.riskSegment ||
+      revenueDecline >= thresholds.revenue ||
+      frequencyDecline >= thresholds.frequency ||
+      engagementDecline >= thresholds.engagement,
     affectedPercentage: Math.round(pct),
     reasons: [
-      pct >= 20 && "Risk concentration",
-      revenueDecline >= 15 && "Revenue decline",
-      frequencyDecline >= 20 && "Purchase frequency decline",
-      engagementDecline >= 25 && "Engagement decline",
+      pct >= thresholds.riskSegment && "Risk concentration",
+      revenueDecline >= thresholds.revenue && "Revenue decline",
+      frequencyDecline >= thresholds.frequency && "Purchase frequency decline",
+      engagementDecline >= thresholds.engagement && "Engagement decline",
     ].filter(Boolean),
   };
 }

@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { NextRequest, NextResponse } from "next/server";
 import {
+  cleanChatText,
   deterministicChatAnswer,
   type AvoChatContext,
 } from "@/lib/avo-chat";
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
     if (!response.output_text)
       throw new Error("Live chat provider returned no answer");
     return NextResponse.json({
-      answer: response.output_text,
+      answer: cleanChatText(response.output_text),
       provider: "Xiaomi MiMo live provider",
       demo: false,
     });
