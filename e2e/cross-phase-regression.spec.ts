@@ -77,9 +77,9 @@ test("Cross-phase imported operational pipeline changes customer state and audit
   );
   await page.getByRole("button", { name: "Send AVO message" }).click();
   expect((await chatResponse).ok()).toBe(true);
-  await expect(
-    page.getByText(/Iris Demo.*CUS-1015|CUS-1015.*Iris Demo/i),
-  ).toBeVisible();
+  const chatAnswer = page.locator(".message.customer-msg").last();
+  await expect(chatAnswer).toContainText("Iris Demo");
+  await expect(chatAnswer).toContainText("CUS-1015");
   await expect(
     page
       .locator(".message strong")

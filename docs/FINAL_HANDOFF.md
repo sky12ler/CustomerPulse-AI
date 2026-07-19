@@ -5,8 +5,8 @@ Verification date: 20 July 2026 (Asia/Kuala Lumpur).
 ## Release reference
 
 - Production URL: https://customer-pulse-ai-eight.vercel.app
-- Deployed application commit: `4a58378`
-- Vercel deployment: `dpl_9CbU2JPR7c9UQZdsEr6JWJkTEPLn` (`READY`, production)
+- Deployed application commit: `a79de60`
+- Vercel deployment: `dpl_B9cNAkdqjJhZW2jDNGPL7HaJ1mr5` (`READY`, production)
 - Production MiMo connection: verified against the configured OpenAI-compatible endpoint with model `mimo-v2.5-pro`
 - Imported Workspace mode: browser-local by product decision; no login or shared anonymous Supabase access
 
@@ -86,7 +86,7 @@ No database or Auth account is required for the selected hackathon workflow. Mig
 
 1. Push the final commit to GitHub.
 2. Confirm all environment variables exist for Production in Vercel.
-3. Redeploy after future application changes. Deployment `dpl_9CbU2JPR7c9UQZdsEr6JWJkTEPLn` currently serves the verified release.
+3. Redeploy after future application changes. Deployment `dpl_B9cNAkdqjJhZW2jDNGPL7HaJ1mr5` currently serves the verified release.
 4. Check `/api/health`; “configured” means credentials exist, while a completed AVO response proves live use.
 5. Select Imported Workspace, import the connected scenario pack and refresh in the same browser.
 6. Run the 45-test Playwright regression against the production URL and record any environment-only failures honestly.
