@@ -139,7 +139,7 @@ describe("AVO providers", () => {
     const provider = new XiaomiMiMoProvider(async (value) => {
       request = value;
       return {
-        output_text: JSON.stringify({ ...valid, uncertainty_reason: "None" }),
+        output_text: JSON.stringify({ ...valid, uncertainty_reason: "" }),
       };
     });
     const out = await provider.analyze(customers[0]);
