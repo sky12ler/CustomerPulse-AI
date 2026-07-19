@@ -62,6 +62,10 @@ export interface AuditEvent {
   result: string;
   at: string;
   correlationId: string;
+  beforeState?: Record<string, unknown> | null;
+  afterState?: Record<string, unknown> | null;
+  reason?: string;
+  reviewerComment?: string;
 }
 export interface Recommendation {
   id: string;

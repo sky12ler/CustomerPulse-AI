@@ -1,6 +1,8 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
+import Link from "next/link";
+import { getSupabaseAccessToken } from "@/lib/supabase-browser";
 import {
   AlertTriangle,
   Archive,
@@ -61,8 +63,8 @@ import {
   AnalyticsV2,
   CalendarV2,
   CampaignStudioV2,
-  MarketingV2,
 } from "@/components/marketing-workflow";
+import { OperationalMarketing } from "@/components/operational-marketing";
 
 const nav = [
   [
@@ -289,6 +291,7 @@ function DashboardInner({ initialPage }: { initialPage: string }) {
   const [toast, setToast] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [locationVersion, setLocationVersion] = useState(0);
+  const [serviceHealth, setServiceHealth] = useState({ avoProvider: "demo", publisher: "demo" });
 
   useEffect(() => {
     const syncRoute = () => {
@@ -298,6 +301,12 @@ function DashboardInner({ initialPage }: { initialPage: string }) {
     };
     window.addEventListener("popstate", syncRoute);
     return () => window.removeEventListener("popstate", syncRoute);
+  }, []);
+  useEffect(() => {
+    fetch("/api/health")
+      .then((response) => response.json())
+      .then((health) => setServiceHealth({ avoProvider: health.avoProvider ?? "demo", publisher: health.publisher ?? "demo" }))
+      .catch(() => setServiceHealth({ avoProvider: "unavailable", publisher: "unavailable" }));
   }, []);
 
   const go = (destination: string) => {
@@ -419,6 +428,9 @@ function DashboardInner({ initialPage }: { initialPage: string }) {
                   ? "Synthetic Demo Workspace"
                   : "Imported Workspace"}
               </span>
+              <span className={`demo-label ${demo.persistence.status === "error" ? "danger" : ""}`} title={demo.persistence.error || "Imported Workspace persistence status"}>
+                {demo.persistence.mode === "supabase" ? `Supabase · ${demo.persistence.status}` : demo.persistence.configured ? "Local · sign in for Supabase" : "Local browser storage"}
+              </span>
               <select
                 aria-label="Active workspace"
                 className="input"
@@ -456,6 +468,8 @@ function DashboardInner({ initialPage }: { initialPage: string }) {
                 aria-label="Demo account"
                 className="input"
                 value={role}
+                disabled={state.activeWorkspace === "imported" && demo.persistence.authenticated}
+                title={state.activeWorkspace === "imported" && demo.persistence.authenticated ? "Role is controlled by the signed-in Supabase account" : "Switch synthetic demo role"}
                 onChange={(e) => {
                   demo.setRole(e.target.value as Role);
                   notify(`Signed in as ${e.target.value} demo account`);
@@ -467,6 +481,11 @@ function DashboardInner({ initialPage }: { initialPage: string }) {
                 <option>Account Executive</option>
                 <option>Auditor</option>
               </select>
+              {demo.persistence.authenticated ? (
+                <button className="btn btn-outline" title={demo.persistence.email} onClick={() => void demo.signOut()}>Sign out</button>
+              ) : (
+                <Link className="btn btn-outline" href="/login">Sign in</Link>
+              )}
               <div className="avatar">
                 {role
                   .split(" ")
@@ -486,7 +505,8 @@ function DashboardInner({ initialPage }: { initialPage: string }) {
                 <div className="subtle">{sub}</div>
               </div>
               <div className="top-actions">
-                <span className="demo-label">AVO Demo Analysis available</span>
+                <span className="demo-label">AVO: {serviceHealth.avoProvider === "demo" ? "Demo fallback" : serviceHealth.avoProvider}</span>
+                <span className="demo-label">Publisher: {serviceHealth.publisher === "demo" ? "Demo Publisher" : serviceHealth.publisher}</span>
               </div>
             </div>
             <Page
@@ -561,7 +581,7 @@ function Page({
     case "actions":
       return <ActionsV2 notify={notify} role={role} go={go} />;
     case "marketing":
-      return <MarketingV2 go={go} notify={notify} />;
+      return <OperationalMarketing go={go} notify={notify} />;
     case "campaign-studio":
       return <CampaignStudioV2 notify={notify} role={role} go={go} />;
     case "campaign-calendar":
@@ -585,12 +605,23 @@ function Overview({ go }: { go: (p: string) => void }) {
   const atRisk = customers.filter(
     (c) => c.risk === "High" || c.risk === "Critical",
   );
+  const visibleIds = new Set(customers.map((customer) => customer.id));
+  const visibleActions = demo.state.actions.filter(
+    (action) => action.datasetId === demo.state.activeWorkspace && visibleIds.has(action.customerId),
+  );
+  const requiresAction = visibleActions.filter((action) =>
+    ["Pending Approval", "Changes Requested", "Approved and Ready", "In Progress", "Waiting for Customer", "Outcome Required"].includes(action.status),
+  );
+  const pendingRetention = visibleActions.filter((action) => action.status === "Pending Approval").length;
+  const pendingCampaigns = demo.state.campaigns.filter((campaign) => campaign.datasetId === demo.state.activeWorkspace && campaign.status === "Pending Approval").length;
+  const approvedActions = visibleActions.filter((action) => action.history.some((item) => item.status === "Approved and Ready" || item.status === "Approved"));
+  const editedActions = visibleActions.filter((action) => action.originalAvoOutput !== action.humanEditedOutput);
+  const abstentions = demo.dataset.analyses.filter((analysis) => analysis.confidence < 50).length;
 
   const attentionCustomers = [...customers]
     .sort(
       (a, b) =>
-        Number(b.scenario === "A") - Number(a.scenario === "A") ||
-        b.riskScore - a.riskScore,
+        b.riskScore - a.riskScore || b.revenueAtRisk - a.revenueAtRisk,
     )
     .slice(0, 5);
   return (
@@ -609,19 +640,19 @@ function Overview({ go }: { go: (p: string) => void }) {
           [
             "High / Critical risk",
             `${atRisk.length}`,
-            "2 require action today",
+            `${requiresAction.length} have an open governed action`,
             AlertTriangle,
           ],
           [
             "Revenue at risk",
             money(atRisk.reduce((s, c) => s + c.revenueAtRisk, 0)),
-            "↓ 6.8% after recoveries",
+            "ERAR-v1: eligible 90-day revenue × churn probability",
             Gauge,
           ],
           [
             "Pending approvals",
-            "4",
-            "2 retention · 2 marketing",
+            String(pendingRetention + pendingCampaigns),
+            `${pendingRetention} retention · ${pendingCampaigns} marketing`,
             ClipboardCheck,
           ],
         ].map(([l, v, t, I]) => (
@@ -639,6 +670,7 @@ function Overview({ go }: { go: (p: string) => void }) {
         <div className="card">
           <div className="card-head">
             <h2>Risk and revenue trend</h2>
+            <span className="demo-label">Synthetic demo baseline</span>
             <button className="btn btn-outline" onClick={() => go("analytics")}>
               View analytics <ChevronRight size={13} />
             </button>
@@ -668,20 +700,9 @@ function Overview({ go }: { go: (p: string) => void }) {
         <div className="card">
           <div className="card-head">
             <h2>Today’s priorities</h2>
-            <span className="badge high">4 open</span>
+            <span className="badge high">{attentionCustomers.length} shown</span>
           </div>
-          <Priority
-            customer={customers[0]}
-            text="Critical risk · service recovery due"
-          />
-          <Priority
-            customer={customers[2]}
-            text="Segment price objection pattern"
-          />
-          <Priority
-            customer={customers[1]}
-            text="Grounded cross-sell opportunity"
-          />
+          {attentionCustomers.slice(0, 3).map((customer) => <Priority key={customer.id} customer={customer} text={`${customer.riskScore} risk score · ${customer.alerts ? `${customer.alerts} active alert` : "monitoring"}`} />)}
           <div className="notice warning" style={{ marginTop: 10 }}>
             AVO supports staff decisions. Final decisions and actions remain the
             responsibility of authorised employees.
@@ -701,19 +722,19 @@ function Overview({ go }: { go: (p: string) => void }) {
         <div className="card">
           <div className="card-head">
             <h2>AVO governance pulse</h2>
-            <span className="demo-label">Synthetic metrics</span>
+            <span className="demo-label">Observed workflow data</span>
           </div>
           <div className="kpis">
             <div className="kpi">
-              <strong>82%</strong>
+              <strong>{visibleActions.length ? Math.round((approvedActions.length / visibleActions.length) * 100) : 0}%</strong>
               <span>approved after review</span>
             </div>
             <div className="kpi">
-              <strong>31%</strong>
+              <strong>{visibleActions.length ? Math.round((editedActions.length / visibleActions.length) * 100) : 0}%</strong>
               <span>human-edited</span>
             </div>
             <div className="kpi">
-              <strong>4</strong>
+              <strong>{abstentions}</strong>
               <span>AVO abstentions</span>
             </div>
           </div>
@@ -869,15 +890,22 @@ function Alerts({
   go: (p: string) => void;
   notify: (s: string) => void;
 }) {
-  const customers = useDemoWorkflow().accessibleCustomers;
+  const demo = useDemoWorkflow();
+  const customers = demo.accessibleCustomers;
+  const customerIds = new Set(customers.map((customer) => customer.id));
   const [risk, setRisk] = useState("All"),
     [owner, setOwner] = useState("All");
-  const rows = customers.filter(
-    (c) =>
-      c.alerts &&
-      (risk === "All" || c.risk === risk) &&
-      (owner === "All" || c.staff === owner),
-  );
+  const rows = demo.dataset.alerts
+    .filter((alert) => alert.status === "Active" && customerIds.has(alert.customerId))
+    .map((alert) => ({
+      alert,
+      customer: customers.find((customer) => customer.id === alert.customerId)!,
+      calculation: demo.dataset.churnCalculations[alert.customerId],
+    }))
+    .filter(({ alert }) =>
+      (risk === "All" || alert.currentRisk === risk) &&
+      (owner === "All" || alert.owner === owner),
+    );
   return (
     <div className="card">
       <div className="card-head">
@@ -930,8 +958,8 @@ function Alerts({
             </tr>
           </thead>
           <tbody>
-            {rows.map((c, i) => (
-              <tr key={c.id}>
+            {rows.map(({ alert, customer: c, calculation }) => (
+              <tr key={alert.id}>
                 <td>
                   <a
                     className="customer-name-link"
@@ -950,16 +978,15 @@ function Alerts({
                   </div>
                 </td>
                 <td>
-                  {c.scenario === "A"
-                    ? "Cancellation + missed follow-up"
-                    : "Elevated risk threshold"}
+                  {alert.trigger}
+                  <div className="subtle">{alert.previousRisk} → {alert.currentRisk} · score change {calculation?.scoreChange ?? 0}</div>
                 </td>
                 <td>
                   {badge(c.risk)} <strong>{c.riskScore}</strong>
                 </td>
                 <td>{c.confidence}%</td>
-                <td>{c.risk === "Critical" ? "Within 24h" : "Within 48h"}</td>
-                <td>{badge(i ? "Assigned" : "New")}</td>
+                <td>{alert.deadline}</td>
+                <td>{badge(alert.status)}<div className="subtle">{alert.owner} · {money(calculation?.estimatedRevenueAtRisk ?? 0)} ERAR</div></td>
                 <td>
                   <button
                     className="btn btn-outline"
@@ -1107,9 +1134,10 @@ function Customer360({
   const run = async () => {
     setLoading(true);
     try {
+      const accessToken = await getSupabaseAccessToken();
       const r = await fetch("/api/avo/analyze", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
           body: JSON.stringify({
             customerId: c.id,
             customer: c,
@@ -1130,7 +1158,9 @@ function Customer360({
       );
       notify(
         data.demo
-          ? "AVO Demo Analysis completed"
+          ? data.fallbackReason
+            ? `AVO Demo fallback used: ${data.fallbackReason}`
+            : "AVO Demo Analysis completed"
           : "Live AVO analysis completed",
       );
     } catch (e) {
@@ -1294,7 +1324,7 @@ function Customer360({
       (item) => item.customerId === c.id,
     );
     body = analysis ? (
-      <AnalysisPanel analysis={analysis} notify={notify} />
+      <AnalysisPanel analysis={analysis} customerId={c.id} notify={notify} />
     ) : storedAnalysis ? (
       <div>
         <div className="notice">Stored validated AVO analysis</div>
@@ -1594,6 +1624,7 @@ function Conversations({
     [risk, setRisk] = useState("All"),
     [owner, setOwner] = useState("All");
   const [analysis, setAnalysis] = useState<AVOAnalysis | null>(null);
+  const [analysisMode, setAnalysisMode] = useState<"demo" | "live" | "">("");
   const [loading, setLoading] = useState(false);
   const workflow = useWorkflow();
   const filtered = eligible.filter(
@@ -1609,9 +1640,10 @@ function Conversations({
   const run = async () => {
     setLoading(true);
     try {
+      const accessToken = await getSupabaseAccessToken();
       const r = await fetch("/api/avo/analyze", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
         body: JSON.stringify({
           customerId: selected.id,
           customer: selected,
@@ -1621,6 +1653,7 @@ function Conversations({
       const data = await r.json();
       if (!r.ok) throw new Error(data.error);
       setAnalysis(data.analysis);
+      setAnalysisMode(data.demo ? "demo" : "live");
       const rejected = demo.storeAnalysis(selected.id, data.analysis);
       if (rejected.length)
         throw new Error(`Invalid evidence IDs: ${rejected.join(", ")}`);
@@ -1631,7 +1664,9 @@ function Conversations({
       );
       notify(
         data.demo
-          ? "AVO Demo Analysis completed — fallback clearly labelled"
+          ? data.fallbackReason
+            ? `AVO Demo fallback used: ${data.fallbackReason}`
+            : "AVO Demo Analysis completed — fallback clearly labelled"
           : "AVO analysis completed with configured model",
       );
     } catch (e) {
@@ -1709,6 +1744,7 @@ function Conversations({
               onClick={() => {
                 setSelected(c);
                 setAnalysis(null);
+                setAnalysisMode("");
               }}
             >
               <div className="split">
@@ -1789,7 +1825,7 @@ function Conversations({
       <div className="card">
         <div className="card-head">
           <h2>AVO Analysis</h2>
-          {analysis && <span className="demo-label">AVO Demo Analysis</span>}
+          {analysis && <span className="demo-label">{analysisMode === "demo" ? "AVO Demo fallback" : "Live AVO provider"}</span>}
         </div>
         {!analysis ? (
           <div className="empty">
@@ -1800,7 +1836,11 @@ function Conversations({
             </p>
           </div>
         ) : (
-          <AnalysisPanel analysis={analysis} notify={notify} />
+          <AnalysisPanel
+            analysis={analysis}
+            customerId={selected.id}
+            notify={notify}
+          />
         )}
       </div>
     </div>
@@ -1808,16 +1848,25 @@ function Conversations({
 }
 function AnalysisPanel({
   analysis: a,
+  customerId,
   notify,
 }: {
   analysis: AVOAnalysis;
+  customerId: string;
   notify: (s: string) => void;
 }) {
-  const workflow = useWorkflow();
+  const demo = useDemoWorkflow();
+  const [createdId, setCreatedId] = useState("");
   const generate = () => {
-    const id = a.primary_intent === "Product discovery" ? "REC-002" : "REC-001";
-    workflow.setRecommendation(id, "Draft");
-    notify(`Draft ${id} created and recorded; manager approval required`);
+    try {
+      const recommendation = demo.createRecommendation(customerId);
+      setCreatedId(recommendation.id);
+      notify(
+        `Customer-specific draft ${recommendation.id} created; manager approval required`,
+      );
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Recommendation creation failed");
+    }
   };
   return (
     <div>
@@ -1865,8 +1914,18 @@ function AnalysisPanel({
         style={{ width: "100%", marginTop: 12 }}
         onClick={generate}
       >
-        Generate AVO Recommendation
+        {createdId ? "Recommendation Created" : "Generate AVO Recommendation"}
       </button>
+      {createdId && (
+        <a
+          className="btn btn-outline"
+          style={{ width: "100%", marginTop: 8 }}
+          href={`/recommendations?recommendationId=${encodeURIComponent(createdId)}`}
+          aria-label={`Open generated recommendation ${createdId}`}
+        >
+          Open {createdId} in Recommendations
+        </a>
+      )}
     </div>
   );
 }

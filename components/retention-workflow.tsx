@@ -2,9 +2,12 @@
 
 import { useState } from "react";
 import { CheckCircle2, MessageCircle } from "lucide-react";
-import { customers, recommendations } from "@/lib/demo-data";
+import { customers } from "@/lib/demo-data";
 import { canOutreach } from "@/lib/engines";
-import type { RetentionActionRecord } from "@/lib/demo-workflow";
+import type {
+  RecommendationRecord,
+  RetentionActionRecord,
+} from "@/lib/demo-workflow";
 import type { Role } from "@/lib/types";
 import type { OutcomeType } from "@/lib/operational";
 import { useDemoWorkflow } from "./workflow-context";
@@ -36,24 +39,27 @@ export function RecommendationsV2({
   const accessibleIds = new Set(
     demo.accessibleCustomers.map((customer) => customer.id),
   );
-  const accessibleRecommendations = recommendations.filter((item) =>
-    accessibleIds.has(item.customerId),
+  const accessibleRecommendations = demo.state.recommendations.filter(
+    (item) =>
+      item.datasetId === demo.state.activeWorkspace &&
+      accessibleIds.has(item.customerId),
   );
   const [selected, setSelected] = useState(
     () =>
       new URLSearchParams(
         typeof window === "undefined" ? "" : window.location.search,
-      ).get("recommendationId") ?? "REC-001",
+      ).get("recommendationId") ?? accessibleRecommendations[0]?.id ?? "",
   );
   const current =
     demo.state.recommendationStatuses[selected] === "Submitted" ? 5 : 4;
-  if (demo.state.activeWorkspace === "imported")
+  if (!accessibleRecommendations.length)
     return (
       <section className="card empty">
-        <h2>No imported recommendations yet</h2>
+        <h2>No recommendations yet</h2>
         <p>
           Import customers and transactions, then run AVO on authorised
-          conversations. Demo recommendations remain isolated in Demo Workspace.
+          conversations. A customer-specific draft will appear here after you
+          select Generate AVO Recommendation.
         </p>
       </section>
     );
@@ -113,7 +119,7 @@ function RecommendationDetail({
   notify,
   go,
 }: {
-  rec: (typeof recommendations)[number];
+  rec: RecommendationRecord;
   notify: (s: string) => void;
   go: (s: string) => void;
 }) {
@@ -128,7 +134,7 @@ function RecommendationDetail({
   );
   const [owner, setOwner] = useState(rec.owner);
   const [deadline, setDeadline] = useState(
-    rec.id === "REC-001" ? "2026-07-19" : "2026-07-23",
+    rec.deadline,
   );
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
@@ -142,7 +148,7 @@ function RecommendationDetail({
       !owner.trim() ||
       !deadline ||
       !draft.trim() ||
-      !customer.messages.some((message) => message.evidence) ||
+      !rec.evidenceIds.length ||
       !linked?.approver
     )
       return setError(
@@ -225,7 +231,7 @@ function RecommendationDetail({
       </label>
       <h3>Evidence</h3>
       {customer.messages
-        .filter((message) => message.evidence)
+        .filter((message) => rec.evidenceIds.includes(message.id))
         .slice(0, 3)
         .map((message) => (
           <div className="evidence" key={message.id}>
@@ -234,8 +240,7 @@ function RecommendationDetail({
           </div>
         ))}
       <div className="notice">
-        Confidence: {rec.confidence}. Uncertainty: future customer behaviour
-        cannot be confirmed; validate current delivery status.
+        Confidence: {rec.confidence}. Uncertainty: {rec.uncertainty}
       </div>
       {error && (
         <div className="notice danger" role="alert">
@@ -636,6 +641,11 @@ function ActionDetail(props: ActionDetailProps) {
     go,
   } = props;
   const demo = useDemoWorkflow();
+  const [reassignOwner, setReassignOwner] = useState(action.owner);
+  const customer = demo.dataset.customers.find((item) => item.id === action.customerId);
+  const followUpAllowed = Boolean(
+    customer && canOutreach(customer, action.actionType),
+  );
   return (
     <section className="card action-detail">
       <div className="card-head">
@@ -771,18 +781,21 @@ function ActionDetail(props: ActionDetailProps) {
                 </button>
                 <button
                   className="btn btn-outline"
-                  disabled={!manager}
+                  disabled={!manager || reassignOwner === action.owner}
+                  title={!manager ? "Sales Manager or Administrator role is required" : reassignOwner === action.owner ? "Choose a different owner" : ""}
                   onClick={() => {
-                    demo.log(
-                      "Retention action reassigned",
-                      action.id,
-                      "Success",
-                    );
+                    const at = new Date().toISOString();
+                    demo.update((current) => ({
+                      ...current,
+                      actions: current.actions.map((item) => item.id === action.id ? { ...item, owner: reassignOwner, history: [...item.history, { fromStatus: item.status, status: item.status, actor: current.role === "Administrator" ? "Demo Administrator" : "Farah Chen", role: current.role, comment: `Owner reassigned from ${item.owner} to ${reassignOwner}`, at }] } : item),
+                    }));
+                    demo.log("Retention action reassigned", action.id, "Success", `${action.owner} -> ${reassignOwner}`);
                     notify("Action reassigned and audited");
                   }}
                 >
                   Reassign
                 </button>
+                <select className="input compact" aria-label="Reassign action owner" value={reassignOwner} onChange={(event) => setReassignOwner(event.target.value)} disabled={!manager}><option>Aisha Rahman</option><option>Daniel Wong</option></select>
                 <button
                   className="btn btn-outline"
                   disabled={!manager}
@@ -934,9 +947,13 @@ function ActionDetail(props: ActionDetailProps) {
               </button>{" "}
               <button
                 className="btn btn-outline"
+                disabled={!followUpAllowed}
+                title={!followUpAllowed ? "Follow-up is blocked because channel consent or contact details are missing" : ""}
                 onClick={() => {
-                  demo.log("Approved follow-up sent", action.id, "Success");
-                  notify("Approved follow-up recorded in the audit trail.");
+                  const at = new Date().toISOString();
+                  demo.update((current) => ({ ...current, actions: current.actions.map((item) => item.id === action.id ? { ...item, executionStatus: "Approved follow-up sent; waiting for customer", history: [...item.history, { fromStatus: item.status, status: item.status, actor: item.owner, role: current.role, comment: `Approved ${item.actionType} follow-up executed`, at }] } : item) }));
+                  demo.log("Approved follow-up executed", action.id, "Success", action.actionType);
+                  notify("Approved follow-up executed and added to action history.");
                 }}
               >
                 Send Approved Follow-up

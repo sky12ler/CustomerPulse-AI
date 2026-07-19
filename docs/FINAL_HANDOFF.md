@@ -1,124 +1,126 @@
-# Final production verification and handoff
+# Final handoff
 
 Verification date: 19 July 2026 (Asia/Kuala Lumpur).
 
-## Production release
+## Release reference
 
 - Production URL: https://customer-pulse-ai-eight.vercel.app
-- Application commit: `0e7225d4b1208c3196a991bc48184969f96b6b32`
-- Vercel deployment: `dpl_Bz4gAtdCwcV4H497JCwBDq6vDWmK`
-- Deployment state: `READY`, target `production`, aliased to the production URL.
-- Health: `status: ok`, `release: workflow-v2`, `avoProvider: demo`, `publisher: demo`.
+- Final application commit: recorded after the final push
+- Final Vercel deployment: recorded after the final deployment
+- Local MiMo connection: verified against the configured OpenAI-compatible endpoint with model `mimo-v2.5`
+- Supabase runtime: code complete; migration 003 and role assignment must be applied to the linked project before remote persistence can be claimed production-verified
 
-The complete 45-test Chromium regression passed directly against this production deployment in 1.4 minutes. This was a public-host run, not an inference from local tests.
+## Problems found during the user walkthrough and resolution
 
-## Cross-phase production acceptance
-
-| # | Required behavior | Verified production evidence | Result |
-| --- | --- | --- | --- |
-| 1 | Imports update the operational store | Confirmed customer, transaction and conversation imports changed the Imported Workspace; imported customer, TXN-000 and MSG-A-104 were read back from Customer 360 | Passed |
-| 2 | AVO creates validated signals | Imported Maya analysis persisted evidence-linked `AVO Analysis` signals and a stored analysis with confidence and uncertainty | Passed in Demo AVO mode |
-| 3 | Churn recalculates dynamically | Imports and AVO invoke the authoritative engine and audit score before/after; Omar's recorded outcome changed the actual stored score | Passed |
-| 4 | Alerts create, update and resolve dynamically | Unit cases exercise create/update/resolve/reopen/idempotency; production Maya and Omar workflows exercise alert updates and recovery resolution | Passed |
-| 5 | Changes Requested supports revision/resubmission | Maya moved Pending Approval -> Changes Requested -> Draft Revision -> Pending Approval with versioned content and reviewer feedback | Passed |
-| 6 | Lifecycle transitions are separate | Start, execution confirmation, customer response and outcome each changed a separate state and record | Passed |
-| 7 | Outcome triggers real risk recalculation | Omar's Purchase completed outcome changed customer score, risk, monitored state, summary metrics and audit values | Passed |
-| 8 | Customer links open `/customers/[customerId]` | Name, View Customer, row mouse and keyboard navigation were exercised | Passed |
-| 9 | Refresh preserves Customer 360 | Deep route, active tab and list-return state survived refresh | Passed |
-| 10 | Account Executive sees assigned customers only | Aisha Rahman's list, direct URL, API, action, export and audit scope were exercised; an unassigned customer was denied | Passed |
-| 11 | Filters/sorts/pagination use operational data | All controls changed live scoped results, counts, URL state and pagination | Passed |
-| 12 | Revenue at risk is authoritative | ERAR-v1 uses next-90-day eligible revenue x normalized churn probability; list and Customer 360 agree | Passed |
-| 13 | Customer metrics update after recalculation | Omar's recovery changed at least one risk/revenue summary and Reset restored the original values | Passed |
-| 14 | Analytics updates after actions/outcomes | Analytics changed from Recovery monitoring to Successful recovery and displayed the recorded outcome and current calculated risk | Passed |
-| 15 | Exports respect filters/RBAC | Export followed the current scoped, filtered and sorted result set and excluded inaccessible customers | Passed |
-| 16 | Demo Reset restores original data | Omar's action, customer summaries and analytics returned to seeded state; Imported Workspace remains separate | Passed |
-| 17 | Scenarios A and D complete | Scenario A's governed Maya chain and Scenario D's observed Omar recovery completed end to end | Passed |
-| 18 | Desktop/mobile workflows | Desktop table workflows, mobile cards/navigation and no-horizontal-overflow checks passed | Passed |
-| 19 | Audit contains before/after values | Lifecycle events now record named state before/after; AVO/outcome events record score before/after | Passed |
-
-A recalculation is not claimed to change a rounded score in every case: a valid low-weight signal may produce the same displayed integer. The implementation still stores the signal, runs the engine and audits the actual before/after values.
+| Walkthrough problem | Resolution in this release |
+| --- | --- |
+| Customers were report-only rows | Customer name links, View Customer links, row mouse/Enter/Space navigation and `/customers/[customerId]` Customer 360 |
+| No filters, sorting, metrics or pagination | 11 filters, seven sorts, risk-first default, six live metrics, 10/25/50 pagination and result-aware search text |
+| Revenue at risk was unexplained/inconsistent | ERAR-v1 is authoritative across pages and exposes base, risk probability, calculation version, time and disclaimer |
+| Imported state was browser-only | Supabase Auth, per-entity persistence, RLS, Realtime and append-only audit integration for Imported Workspace |
+| Marketing Intelligence was pre-seeded | Opportunities are grouped and calculated from the active operational customer/transaction/risk data; no threshold match means no manufactured insight |
+| Campaign audience totals ignored consent | Audience inclusion/exclusion is recalculated by segment, current consent and selected channel availability; exclusions include reasons |
+| Campaign Studio always opened CAM-003 | Navigation opens a campaign list/blank state; an insight opens its own prefilled campaign; an existing campaign opens by ID |
+| Pages contradicted one another on risk | Overview, Customers, Customer 360, Alerts and Analytics read the same authoritative operational dataset |
+| AVO reused fixed recommendations | Each analysis creates a customer- and analysis-specific recommendation with its own ID and evidence |
+| Alert Centre reconstructed fake fields | It renders operational alerts with stored trigger/evidence, score movement, owner, deadline, ERAR and status |
+| Calendar showed non-scheduled drafts and shared history | Only scheduled/published/cancelled records use calendar events; history is campaign-specific; reschedule changes date/time; cancel is distinct; filters operate |
+| Decorative controls | Evidence, version comparison, monitor, reassign, approved follow-up, calendar filters, reschedule, cancel, publish and results controls now mutate or reveal stated records |
+| Buffer silently became Demo Publisher | Buffer is unavailable/disabled without credentials; Demo Publisher is visibly selected; server rejects misleading publisher requests |
+| Analytics mixed fixed claims with observed data | Cards identify calculated, observed, imported-result and synthetic/demo sources; campaign results drive observed metrics when imported |
+| Action lifecycle collapsed transitions | Start, execution, customer response and outcome are separate authorised transitions; Changes Requested supports revision/resubmission |
+| Outcome did not prove operational change | Recording a valid outcome stores the outcome and runs tier/churn/ERAR/alert/metric/analytics recalculation with before/after audit |
 
 ## Completed functionality
 
-- Isolated Demo and Imported operational workspaces persisted in browser localStorage.
-- Incremental customer, transaction, conversation, product and document imports with provenance, validation, confirmation, recalculation and audit.
-- Deterministic tier, hybrid churn and ERAR-v1 calculations; evidence-linked AVO analyses become validated or review-required signals rather than writing scores directly.
-- Dynamic alert create/update/resolve/reopen behavior.
-- Governed recommendation lifecycle with Changes Requested, versioned revision, resubmission, different-user approval and separate start/execution/response/outcome transitions.
-- Customer 360 deep links, refresh-safe tabs, operational filters, sorting, pagination, summaries, scoped export and responsive mobile cards.
-- Dynamic customer metrics, retention analytics and audit history based on current operational records.
-- Seven-step campaign workflow, consent and approval gates, Demo Publisher scheduling and calendar highlighting.
-- Demo Reset restores seeded Demo Workspace data without silently mixing it with Imported Workspace records.
+- Dynamic import → deterministic signals/tier → AVO signals → churn/ERAR → alerts pipeline.
+- Governed recommendation/action approval with requester separation, reviewer comments, rejection/change reasons and consent gates.
+- Dynamic segment opportunities, consent-safe campaign audience, seven-step creation, campaign-specific approval, scheduling, publish confirmation and result import.
+- Role persistence in Demo Workspace and database-backed roles in authenticated Imported Workspace.
+- Account Executive assignment scope in UI, APIs, exports and Supabase RLS.
+- Append-only audit writes with actor, role, action, entity, before/after, reason, reviewer and result fields.
+- Resettable demo plus a separate durable Imported Workspace.
+- Connected mixed-risk import fixtures under `mock-data/scenarios/`.
 
-## Quality and security results
+## Quality results
 
-| Gate | Result |
+| Gate | Latest result |
 | --- | --- |
-| ESLint | Passed, zero errors |
-| TypeScript | Passed with `tsc --noEmit` |
-| Vitest | 12 files, 109/109 tests passed |
-| Local Playwright | 45/45 passed against an optimized production server |
-| Production Playwright | 45/45 passed against the public Vercel URL in 1.4 minutes |
-| Production build | Passed locally and on Vercel |
+| ESLint | Passed |
+| TypeScript | Passed |
+| Vitest | 14 files, 118/118 passed |
+| Local production build | Passed as part of Playwright runner |
+| Local Playwright | 45/45 passed against an optimized production server in 35.3 seconds |
+| Xiaomi MiMo endpoint | Connected; `mimo-v2.5` returned output |
 | npm audit | 0 vulnerabilities at `--audit-level=low` |
-| Secret scan | 0 credential-like or private-key matches outside ignored environment/dependency/build paths |
+| Secret scan | Passed; `.env.local` ignored/untracked and no real credential/private-key match |
+| Vercel production regression | Must be rerun after final deployment; no result is pre-claimed |
 
-All permanent mock-data formats are covered by unit parsing tests. Production browser tests explicitly upload `customers.csv`, `transactions.csv`, `conversations.csv`, and `product-catalogue.pdf`.
+## Required environment variables
 
-## Environment variables
-
-No variable is required for the verified credential-free demo. Optional server-side configuration is:
+Imported Workspace:
 
 ```text
-OPENAI_API_KEY=
-OPENAI_MODEL=gpt-5.6
-BUFFER_API_KEY=
-BUFFER_ORGANIZATION_ID=
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
+```
+
+Live MiMo AVO:
+
+```text
+XIAOMIMIMO_API_KEY=
+XIAOMIMIMO_BASE_URL=
+XIAOMIMIMO_MODEL=mimo-v2.5
+```
+
+Optional publishing:
+
+```text
+BUFFER_API_KEY=
+BUFFER_ORGANIZATION_ID=
 NEXT_PUBLIC_APP_URL=
 ```
 
-Without OpenAI or Buffer credentials the UI visibly uses deterministic Demo AVO and Demo Publisher. Never expose OpenAI, Buffer, service-role or Vercel tokens through `NEXT_PUBLIC_*`.
+No variable is required for Synthetic Demo Workspace + Demo AVO + Demo Publisher. Never expose service-role, MiMo or Buffer secrets through `NEXT_PUBLIC_*`.
 
-## Database deployment
+## Database deployment steps
 
-The verified production UI uses browser localStorage. The supplied Supabase schema is not connected to the runtime UI.
+Run in the Supabase SQL Editor, in order:
 
-1. Create a Supabase project and authenticate the Supabase CLI.
-2. Run `supabase link --project-ref <project-ref>`.
-3. Run `supabase db push` to apply both migrations, including assignment-aware RLS and ERAR-v1 fields.
-4. Put Supabase values in local/Vercel secret storage; keep `SUPABASE_SERVICE_ROLE_KEY` server-only.
-5. For disposable local data, run `supabase db reset` to apply migrations and `supabase/seed.sql`.
-6. Only for an explicitly configured project, use `node scripts/reset-demo.mjs --confirm`.
-7. Before real customer data, implement the UI database adapter and verify Auth, Storage, two-organization RLS, backup and deletion behavior. Those steps remain future work.
+1. `supabase/migrations/202607180001_initial_schema.sql`
+2. `supabase/migrations/202607190002_customer_assignment_rls.sql`
+3. `supabase/migrations/202607190003_operational_workspace.sql`
 
-## Vercel deployment
+Next, create accounts at `/login`. New sign-ups default to Account Executive. For each administrator, sales manager, marketing manager or auditor, edit and run `supabase/ROLE_SETUP.sql`. Sign out/in after a role change so the UI reloads the database role.
 
-1. Push the intended commit to GitHub.
-2. Link the project with `npx vercel link --yes --project customer-pulse-ai`.
-3. Add optional secrets in Vercel Project Settings; do not commit `.env.local` or `.vercel/`.
-4. Run `npx vercel deploy --prod --yes`.
-5. Confirm `READY`, the production alias and `/api/health` provider modes.
-6. Run `$env:PLAYWRIGHT_BASE_URL='https://customer-pulse-ai-eight.vercel.app'; npx playwright test --workers=1`.
+## Vercel deployment steps
 
-This release used the authenticated Vercel CLI. Automatic Git-to-Vercel deployment was not independently observed.
+1. Push the final commit to GitHub.
+2. Confirm all environment variables exist for Production in Vercel.
+3. Redeploy the production branch.
+4. Check `/api/health`; “configured” means credentials exist, while a completed AVO response proves live use.
+5. Sign in, select Imported Workspace, import the connected scenario pack and refresh in a second session.
+6. Run the 45-test Playwright regression against the production URL and record any environment-only failures honestly.
 
-## Demo accounts and scenarios
+## Accounts
 
-The deployed UI has no login/password. Use the persisted Demo account selector: Administrator, Sales Manager, Marketing Manager, Account Executive or Auditor.
+Demo Workspace uses the on-screen roles: Administrator, Sales Manager, Marketing Manager, Account Executive and Auditor. No shared production password is committed.
 
-- Scenario A: Maya Tan conversation evidence -> AVO -> alert/recommendation -> Changes Requested/revision -> approval -> start -> execution -> response -> outcome -> recalculation/audit.
-- Scenario B: grounded Growth recommendation using synthetic evidence.
-- Scenario C: segment-decline insight -> seven-step campaign -> different-user approval -> Demo Publisher -> highlighted calendar/audit.
-- Scenario D: Omar Aziz approved recovery -> start -> execution -> response -> Purchase completed outcome -> actual risk/metric/analytics update -> Reset.
+Supabase users are project-specific. Create them through `/login`; use `ROLE_SETUP.sql` to assign elevated roles. An Account Executive’s profile display name/email must match a customer’s assigned staff value for automatic assignment during import.
+
+## Demo scenarios
+
+- A: Maya Tan complaint/cancellation evidence → AVO → customer-specific recommendation → changes/revision → approval → start → execution → response → outcome → risk/audit.
+- B: Ethan Lim product-interest evidence → grounded Growth recommendation.
+- C: calculated North Food & Beverage opportunity → consent-safe audience → campaign approval → Demo Publisher → calendar → published/results.
+- D: Omar Aziz recovery action → separate transitions → purchase outcome → actual recalculation → metrics/analytics → Demo Reset.
+- Imported mixed cases: use the three files in `mock-data/scenarios/` to show critical, growth, withdrawn-consent, insufficient-evidence, stable, recovery and unavailable-channel behavior.
 
 ## Remaining limitations
 
-- Live OpenAI/GPT-5.6 responses were not tested because no API key was available; Demo AVO is the verified mode.
-- Live Buffer publishing/callbacks were not tested; Demo Publisher is the verified mode.
-- Supabase Auth, persistence, Storage and remote RLS are supplied as deployment artifacts but are not connected or production-tested.
-- WhatsApp/email are user-initiated or staff-confirmed demo actions, not verified external sending/ingestion.
-- Browser-local state does not synchronize across users, browsers or devices.
-- CRM sync, background monitoring, ZIP import, image generation and advanced image processing are not implemented or verified.
+- Demo Publisher is an in-app simulator, not social delivery.
+- WhatsApp/email are user-initiated links or staff-confirmed transitions; delivery and inbound responses are not integrated.
+- Image generation/advanced image processing and CRM sync are not implemented.
+- Supabase production behavior cannot be claimed until migration 003, user roles and the deployed regression are completed on the linked project.
+- MiMo can still fail because of provider quota, model access or endpoint availability; the application reports the fallback instead of hiding it.

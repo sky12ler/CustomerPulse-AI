@@ -94,8 +94,11 @@ export class BufferPublisher implements SocialPublisher {
     };
   }
 }
-export function getPublisher(): SocialPublisher {
-  return process.env.BUFFER_API_KEY
-    ? new BufferPublisher()
-    : new DemoSocialPublisher();
+export function getPublisher(
+  requested?: "Demo Publisher" | "Buffer",
+): SocialPublisher {
+  if (requested === "Buffer" && !process.env.BUFFER_API_KEY)
+    throw new Error("Buffer connection required; select Demo Publisher or configure BUFFER_API_KEY");
+  if (requested === "Demo Publisher") return new DemoSocialPublisher();
+  return process.env.BUFFER_API_KEY ? new BufferPublisher() : new DemoSocialPublisher();
 }

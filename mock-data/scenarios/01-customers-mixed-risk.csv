@@ -1,0 +1,9 @@
+customer_external_id,customer_name,company_name,industry,region,assigned_staff_email,email,phone,preferred_channel,consent_status,customer_since
+IMP-RISK-001,Alicia Severe,Forge One Ltd,Manufacturing,West,Aisha Rahman,alicia@forgeone.example,601177770001,WhatsApp,granted,2020-01-10
+IMP-GROW-002,Brandon Growth,Forge Two Ltd,Manufacturing,West,Aisha Rahman,brandon@forgetwo.example,601177770002,Email,granted,2022-03-12
+IMP-PRICE-003,Chen Price,Forge Three Ltd,Manufacturing,West,Aisha Rahman,chen@forgethree.example,601177770003,Email,granted,2021-05-15
+IMP-NOCONSENT-004,Divya Private,Forge Four Ltd,Manufacturing,West,Aisha Rahman,divya@forgefour.example,601177770004,WhatsApp,withdrawn,2023-07-20
+IMP-QUIET-005,Emil Quiet,Forge Five Ltd,Manufacturing,West,Aisha Rahman,emil@forgefive.example,601177770005,Email,granted,2024-02-01
+IMP-STABLE-006,Farah Stable,Beacon Retail Ltd,Retail,Central,Aisha Rahman,farah@beacon.example,601177770006,Email,granted,2021-09-01
+IMP-RECOVER-007,Gavin Recover,Care Axis Ltd,Healthcare,East,Aisha Rahman,gavin@careaxis.example,601177770007,WhatsApp,granted,2019-11-21
+IMP-NOCONTACT-008,Hana No Contact,Forge Six Ltd,Manufacturing,West,Aisha Rahman,,,Email,granted,2022-12-11

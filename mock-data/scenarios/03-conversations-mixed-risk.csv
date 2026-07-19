@@ -1,0 +1,10 @@
+conversation_id,message_id,customer_external_id,channel,sender_type,sender_name,message_text,sent_at
+IMP-CON-001,IMP-MSG-001A,IMP-RISK-001,WhatsApp,customer,Alicia Severe,"The replacement is late again and the complaint is still unresolved.",2026-07-10T09:00:00Z
+IMP-CON-001,IMP-MSG-001B,IMP-RISK-001,WhatsApp,staff,Aisha Rahman,"I will update you by Friday.",2026-07-10T10:00:00Z
+IMP-CON-001,IMP-MSG-001C,IMP-RISK-001,WhatsApp,customer,Alicia Severe,"Friday passed with no update. We are speaking with a competitor and may cancel.",2026-07-15T09:00:00Z
+IMP-CON-002,IMP-MSG-002A,IMP-GROW-002,Email,customer,Brandon Growth,"The rollout is going well. Can you show us an approved analytics option?",2026-07-12T08:30:00Z
+IMP-CON-003,IMP-MSG-003A,IMP-PRICE-003,Support chat,customer,Chen Price,"Order volume is lower and the package price is difficult to justify.",2026-07-11T11:20:00Z
+IMP-CON-004,IMP-MSG-004A,IMP-NOCONSENT-004,WhatsApp,customer,Divya Private,"The current package price is too high for our lower order volume.",2026-07-11T12:20:00Z
+IMP-CON-005,IMP-MSG-005A,IMP-QUIET-005,Email,customer,Emil Quiet,"Please send the latest account statement.",2026-07-13T07:15:00Z
+IMP-CON-007,IMP-MSG-007A,IMP-RECOVER-007,WhatsApp,customer,Gavin Recover,"Thank you. The issue is resolved and our next order has been placed.",2026-07-16T08:00:00Z
+IMP-CON-008,IMP-MSG-008A,IMP-NOCONTACT-008,Email,customer,Hana No Contact,"Our orders are falling because the package price is difficult to justify.",2026-07-14T08:00:00Z

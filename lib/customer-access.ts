@@ -13,8 +13,9 @@ export type CustomerAccessResult =
 export function accessibleCustomers(
   customers: Customer[],
   role: Role,
+  ownerOverride?: string,
 ): Customer[] {
-  const owner = DEMO_ROLE_OWNER[role];
+  const owner = role === "Account Executive" ? ownerOverride ?? DEMO_ROLE_OWNER[role] : undefined;
   return owner
     ? customers.filter((customer) => customer.staff === owner)
     : customers;
@@ -24,11 +25,12 @@ export function lookupAccessibleCustomer(
   customers: Customer[],
   role: Role,
   customerId: string,
+  ownerOverride?: string,
 ): CustomerAccessResult {
   const customer = customers.find((item) => item.id === customerId);
   if (!customer) return { status: "not-found" };
   if (
-    !accessibleCustomers(customers, role).some((item) => item.id === customerId)
+    !accessibleCustomers(customers, role, ownerOverride).some((item) => item.id === customerId)
   )
     return { status: "denied" };
   return { status: "allowed", customer };
@@ -38,9 +40,10 @@ export function accessibleActions(
   actions: RetentionActionRecord[],
   customers: Customer[],
   role: Role,
+  ownerOverride?: string,
 ) {
   const allowedIds = new Set(
-    accessibleCustomers(customers, role).map((customer) => customer.id),
+    accessibleCustomers(customers, role, ownerOverride).map((customer) => customer.id),
   );
   return actions.filter((action) => allowedIds.has(action.customerId));
 }

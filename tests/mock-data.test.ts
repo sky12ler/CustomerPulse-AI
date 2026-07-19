@@ -48,4 +48,31 @@ describe("permanent mock imports", () => {
       2629800000;
     expect(months).toBeGreaterThanOrEqual(12);
   });
+  it("contains a connected Imported Workspace multi-scenario pack", () => {
+    const root = path.join(process.cwd(), "mock-data/scenarios");
+    const files = [
+      "01-customers-mixed-risk.csv",
+      "02-transactions-mixed-risk.csv",
+      "03-conversations-mixed-risk.csv",
+      "UPLOAD_MANIFEST.md",
+    ];
+    files.forEach((file) => expect(existsSync(path.join(root, file)), file).toBe(true));
+    const customerRows = Papa.parse(
+      readFileSync(path.join(root, files[0]), "utf8"),
+      { header: true, skipEmptyLines: true },
+    ).data as Record<string, string>[];
+    const ids = new Set(customerRows.map((row) => row.customer_external_id));
+    const transactionRows = Papa.parse(
+      readFileSync(path.join(root, files[1]), "utf8"),
+      { header: true, skipEmptyLines: true },
+    ).data as Record<string, string>[];
+    const conversationRows = Papa.parse(
+      readFileSync(path.join(root, files[2]), "utf8"),
+      { header: true, skipEmptyLines: true },
+    ).data as Record<string, string>[];
+    expect(transactionRows.every((row) => ids.has(row.customer_external_id))).toBe(true);
+    expect(conversationRows.every((row) => ids.has(row.customer_external_id))).toBe(true);
+    expect(customerRows.some((row) => row.consent_status === "withdrawn")).toBe(true);
+    expect(customerRows.some((row) => !row.email && !row.phone)).toBe(true);
+  });
 });

@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { audits } from "@/lib/demo-data";
@@ -31,19 +32,46 @@ import {
   type WorkspaceKind,
 } from "@/lib/operational";
 import {
-  actorForRole,
+  actorForRole as demoActorForRole,
+  canUploadType,
   createInitialDemoState,
   type CampaignDraft,
+  type CampaignResultRecord,
   type DemoWorkflowState,
+  type RecommendationRecord,
   type RetentionActionRecord,
   type ScheduledPostRecord,
 } from "@/lib/demo-workflow";
+import {
+  calculateCampaignAudience,
+  calculateMarketingOpportunities,
+  calculateSegmentAudience,
+} from "@/lib/marketing-operational";
+import {
+  getSupabaseBrowserClient,
+  supabaseBrowserConfigured,
+} from "@/lib/supabase-browser";
+import {
+  mergeImportedEntityRecords,
+  serializeImportedEntities,
+  type PersistedEntityRecord,
+} from "@/lib/workspace-persistence";
 
 const STORAGE_KEY = "customerpulse-demo-v2";
 
 interface WorkflowContextValue {
   state: DemoWorkflowState;
   hydrated: boolean;
+  persistence: {
+    configured: boolean;
+    authenticated: boolean;
+    mode: "supabase" | "local";
+    status: "checking" | "synced" | "saving" | "error" | "signed-out";
+    email: string;
+    actor: string;
+    error: string;
+  };
+  signOut: () => Promise<void>;
   setRole: (role: Role) => void;
   update: (updater: (state: DemoWorkflowState) => DemoWorkflowState) => void;
   log: (
@@ -93,8 +121,16 @@ interface WorkflowContextValue {
     customerId: string,
     analysis: Parameters<typeof signalsFromAnalysis>[2],
   ) => string[];
+  createRecommendation: (customerId: string) => RecommendationRecord;
   recalculate: (customerId: string, trigger?: string) => void;
   updateCampaign: (patch: Partial<CampaignDraft>) => void;
+  openCampaignFromOpportunity: (opportunityId: string) => CampaignDraft;
+  selectCampaign: (campaignId: string) => void;
+  setOpportunityStatus: (
+    opportunityId: string,
+    status: "Active" | "Monitoring" | "Dismissed",
+    reason?: string,
+  ) => void;
   addScheduledPosts: (posts: ScheduledPostRecord[]) => void;
   reset: () => void;
 }
@@ -107,8 +143,29 @@ export function DemoWorkflowProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const [state, setState] = useState(() => createInitialDemoState(audits));
+  const [state, setState] = useState(() => {
+    const initial = createInitialDemoState(audits);
+    return { ...initial, campaigns: [initial.campaign] };
+  });
   const [hydrated, setHydrated] = useState(false);
+  const [persistence, setPersistence] = useState<WorkflowContextValue["persistence"]>({
+    configured: supabaseBrowserConfigured(),
+    authenticated: false,
+    mode: "local",
+    status: "checking",
+    email: "",
+    actor: "",
+    error: "",
+  });
+  const [databaseReady, setDatabaseReady] = useState(false);
+  const databaseUser = useRef<{ id: string; organizationId: string } | null>(null);
+  const databaseActor = useRef("");
+  const auditBaseline = useRef<Set<string>>(new Set());
+  const remoteApplying = useRef(false);
+  const actorForRole = useCallback(
+    (role: Role) => databaseActor.current || demoActorForRole(role),
+    [],
+  );
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -116,7 +173,14 @@ export function DemoWorkflowProvider({
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
           const parsed = JSON.parse(saved) as DemoWorkflowState;
-          if (parsed.version === 3) setState(parsed);
+          if (parsed.version === 5) {
+            setState({
+              ...parsed,
+              campaigns: parsed.campaigns?.length
+                ? parsed.campaigns
+                : [parsed.campaign],
+            });
+          }
         }
       } catch {
         localStorage.removeItem(STORAGE_KEY);
@@ -129,6 +193,175 @@ export function DemoWorkflowProvider({
   useEffect(() => {
     if (hydrated) localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [hydrated, state]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const client = getSupabaseBrowserClient();
+    if (!client) {
+      const timer = window.setTimeout(() => {
+        setPersistence((current) => ({ ...current, status: "signed-out", mode: "local" }));
+        setDatabaseReady(true);
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+    let cancelled = false;
+    void (async () => {
+      const { data: userData, error: userError } = await client.auth.getUser();
+      if (cancelled) return;
+      if (userError || !userData.user) {
+        setPersistence((current) => ({ ...current, status: "signed-out", mode: "local", authenticated: false, error: userError?.message ?? "" }));
+        setDatabaseReady(true);
+        return;
+      }
+      const user = userData.user;
+      const [{ data: profile, error: profileError }, { data: roles, error: rolesError }] = await Promise.all([
+        client.from("profiles").select("organization_id,display_name,email").eq("id", user.id).maybeSingle(),
+        client.from("user_roles").select("role").eq("profile_id", user.id),
+      ]);
+      if (profileError || rolesError || !profile) {
+        setPersistence((current) => ({ ...current, authenticated: true, status: "error", error: profileError?.message ?? rolesError?.message ?? "Supabase profile is missing" }));
+        setDatabaseReady(true);
+        return;
+      }
+      const roleNames = new Set((roles ?? []).map((item) => item.role));
+      const databaseRole: Role = roleNames.has("administrator")
+        ? "Administrator"
+        : roleNames.has("sales_manager")
+          ? "Sales Manager"
+          : roleNames.has("marketing_manager")
+            ? "Marketing Manager"
+            : roleNames.has("auditor")
+              ? "Auditor"
+              : "Account Executive";
+      databaseUser.current = { id: user.id, organizationId: profile.organization_id };
+      databaseActor.current = profile.display_name || profile.email || user.email || "Authenticated user";
+      const { data: stored, error: loadError } = await client
+        .from("operational_entity_records")
+        .select("entity_type,entity_key,customer_external_id,data")
+        .eq("workspace", "imported")
+        .order("created_at", { ascending: true });
+      if (cancelled) return;
+      setState((current) => {
+        const merged = stored?.length
+          ? mergeImportedEntityRecords(current, stored as PersistedEntityRecord[])
+          : current;
+        auditBaseline.current = new Set(merged.events.map((event) => event.id));
+        return { ...merged, role: databaseRole };
+      });
+      setPersistence({
+        configured: true,
+        authenticated: true,
+        mode: "supabase",
+        status: loadError ? "error" : "synced",
+        email: profile.email ?? user.email ?? "",
+        actor: profile.display_name || profile.email || user.email || "Authenticated user",
+        error: loadError?.message ?? "",
+      });
+      setDatabaseReady(true);
+    })();
+    return () => { cancelled = true; };
+  }, [hydrated]);
+
+  useEffect(() => {
+    const client = getSupabaseBrowserClient();
+    const identity = databaseUser.current;
+    if (!hydrated || !databaseReady || !client || !identity || persistence.mode !== "supabase") return;
+    if (remoteApplying.current) {
+      remoteApplying.current = false;
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        setPersistence((current) => ({ ...current, status: "saving", error: "" }));
+        const writable: Record<Role, string[] | null> = {
+          Administrator: null,
+          "Sales Manager": ["tier_calculation", "churn_calculation", "analysis", "signal", "alert", "response", "outcome", "action", "recommendation"],
+          "Marketing Manager": ["campaign", "marketing_opportunity", "scheduled_post", "campaign_result"],
+          "Account Executive": ["response", "outcome", "action", "recommendation"],
+          Auditor: [],
+        };
+        const allowedTypes = writable[state.role];
+        const records = serializeImportedEntities(state).filter(
+          (item) => allowedTypes === null || allowedTypes.includes(item.entity_type),
+        );
+        const databaseRows = records.map((item) => ({
+          organization_id: identity.organizationId,
+          workspace: "imported",
+          entity_type: item.entity_type,
+          entity_key: item.entity_key,
+          customer_external_id: item.customer_external_id,
+          data: item.data,
+          updated_by: identity.id,
+          updated_at: new Date().toISOString(),
+        }));
+        let error: { message: string } | null = null;
+        for (const batch of [
+          databaseRows.filter((item) => item.entity_type === "customer"),
+          databaseRows.filter((item) => item.entity_type !== "customer"),
+        ]) {
+          if (!batch.length) continue;
+          const result = await client.from("operational_entity_records").upsert(
+            batch,
+            { onConflict: "organization_id,workspace,entity_type,entity_key" },
+          );
+          if (result.error) { error = result.error; break; }
+        }
+        const newEvents = state.events.filter((event) => !auditBaseline.current.has(event.id));
+        if (newEvents.length) {
+          const { error: auditError } = await client.from("audit_logs").insert(
+            newEvents.map((event) => ({
+              organization_id: identity.organizationId,
+              actor_id: identity.id,
+              actor_label: event.actor,
+              actor_role: event.role,
+              action: event.action,
+              entity_type: "workflow_event",
+              entity_id: event.entity,
+              before_state: event.beforeState ?? null,
+              after_state: event.afterState ?? { result: event.result },
+              reason: event.reason ?? null,
+              reviewer_comment: event.reviewerComment ?? null,
+              correlation_id: event.correlationId,
+              result: event.result,
+              external_event_id: event.id,
+            })),
+          );
+          if (!auditError || auditError.code === "23505")
+            newEvents.forEach((event) => auditBaseline.current.add(event.id));
+        }
+        setPersistence((current) => ({ ...current, status: error ? "error" : "synced", error: error?.message ?? "" }));
+      })();
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [databaseReady, hydrated, persistence.mode, state]);
+
+  useEffect(() => {
+    const client = getSupabaseBrowserClient();
+    if (!client || persistence.mode !== "supabase" || !databaseReady) return;
+    const channel = client
+      .channel("customerpulse-imported-workspace")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "operational_entity_records", filter: "workspace=eq.imported" },
+        (payload) => {
+          const changed = payload.new as Record<string, unknown>;
+          if (changed.updated_by === databaseUser.current?.id) return;
+          void client
+            .from("operational_entity_records")
+            .select("entity_type,entity_key,customer_external_id,data")
+            .eq("workspace", "imported")
+            .order("created_at", { ascending: true })
+            .then(({ data, error }) => {
+              if (error || !data) return;
+              remoteApplying.current = true;
+              setState((current) => mergeImportedEntityRecords(current, data as PersistedEntityRecord[]));
+              setPersistence((current) => ({ ...current, status: "synced", error: "" }));
+            });
+        },
+      )
+      .subscribe();
+    return () => { void client.removeChannel(channel); };
+  }, [databaseReady, persistence.mode]);
 
   const update = useCallback(
     (updater: (current: DemoWorkflowState) => DemoWorkflowState) =>
@@ -143,17 +376,23 @@ export function DemoWorkflowProvider({
       entity: string,
       result: string,
       reason = "",
-    ) => ({
-      id: `AUD-${Date.now()}-${current.events.length}`,
-      actor: actorForRole(current.role),
-      role: current.role,
-      action: reason ? `${action} · ${reason}` : action,
-      entity,
-      result,
-      at: timestamp().replace("T", " ").slice(0, 16),
-      correlationId: `COR-DEMO-${Date.now()}`,
-    }),
-    [],
+    ) => {
+      const transition = reason.match(/([^;]+?)\s*->\s*([^;]+)/);
+      return {
+        id: `AUD-${Date.now()}-${current.events.length}`,
+        actor: actorForRole(current.role),
+        role: current.role,
+        action: reason ? `${action} · ${reason}` : action,
+        entity,
+        result,
+        at: timestamp().replace("T", " ").slice(0, 16),
+        correlationId: globalThis.crypto.randomUUID(),
+        beforeState: transition ? { value: transition[1].trim() } : null,
+        afterState: transition ? { value: transition[2].trim() } : { result },
+        reason: reason || undefined,
+      };
+    },
+    [actorForRole],
   );
 
   const log = useCallback(
@@ -172,6 +411,8 @@ export function DemoWorkflowProvider({
     (result: ImportResult, type: string) => {
       let summary!: ImportCommitSummary;
       update((current) => {
+        if (!canUploadType(current.role, type))
+          throw new Error(`${current.role} cannot import ${type}`);
         const workspace: WorkspaceKind =
           current.activeWorkspace === "demo"
             ? "imported"
@@ -199,12 +440,53 @@ export function DemoWorkflowProvider({
           at: timestamp(),
           result,
         };
+        const campaignResults: CampaignResultRecord[] =
+          type === "campaign_results"
+            ? (result.records ?? result.preview).map((row, index) => ({
+                id: `${String(row.campaign_id)}-${String(row.channel)}-${String(row.recorded_at)}-${index}`,
+                datasetId: workspace,
+                sourceType: "Manual Upload",
+                campaignId: String(row.campaign_id ?? ""),
+                campaignName: String(row.campaign_name ?? ""),
+                channel: String(row.channel ?? ""),
+                status: String(row.status ?? "recorded"),
+                audienceSize: Number(row.audience_size ?? 0),
+                impressions: Number(row.impressions ?? 0),
+                clicks: Number(row.clicks ?? 0),
+                responses: Number(row.responses ?? 0),
+                conversions: Number(row.conversions ?? 0),
+                revenue: Number(row.revenue ?? 0),
+                recordedAt: String(row.recorded_at ?? timestamp()),
+                sourceFileName: result.filename,
+              }))
+            : [];
         return {
           ...current,
           activeWorkspace: workspace,
           lastImportSummary: summary,
           datasets: { ...current.datasets, [workspace]: committed.dataset },
+          marketingOpportunities: [
+            ...current.marketingOpportunities.filter(
+              (item) => item.datasetId !== workspace,
+            ),
+            ...calculateMarketingOpportunities(
+              committed.dataset,
+              current.thresholds,
+              current.marketingOpportunities.filter(
+                (item) => item.datasetId === workspace,
+              ),
+            ),
+          ],
           imports: [record, ...current.imports],
+          campaignResults: campaignResults.length
+            ? [
+                ...campaignResults,
+                ...current.campaignResults.filter(
+                  (item) =>
+                    !campaignResults.some((incoming) => incoming.id === item.id),
+                ),
+              ]
+            : current.campaignResults,
           events: [
             createEvent(
               current,
@@ -224,7 +506,108 @@ export function DemoWorkflowProvider({
       });
       return summary;
     },
-    [createEvent, update],
+    [actorForRole, createEvent, update],
+  );
+
+  const createRecommendation = useCallback(
+    (customerId: string) => {
+      const customer = state.datasets[state.activeWorkspace].customers.find(
+        (item) => item.id === customerId,
+      );
+      if (!customer) throw new Error("Customer was not found");
+      if (
+        state.role === "Auditor" ||
+        !accessibleCustomers(
+          state.datasets[state.activeWorkspace].customers,
+          state.role,
+          state.activeWorkspace === "imported" && persistence.authenticated
+            ? persistence.actor
+            : undefined,
+        ).some((item) => item.id === customerId)
+      )
+        throw new Error("Customer access denied");
+      const analysis = state.datasets[state.activeWorkspace].analyses.find(
+        (item) => item.customerId === customerId,
+      );
+      if (!analysis)
+        throw new Error("Run and validate AVO Analysis before generating a recommendation");
+      const existingForAnalysis = state.recommendations.find(
+        (item) => item.analysisId === analysis.id && item.customerId === customerId,
+      );
+      if (existingForAnalysis) return existingForAnalysis;
+      const signals = state.datasets[state.activeWorkspace].signals.filter(
+        (item) => item.analysisId === analysis.id,
+      );
+      const types = new Set(signals.map((item) => item.type));
+      const action =
+        types.has("Cancellation intent") || types.has("Severe complaint")
+          ? "Resolve validated service issues before any promotional outreach"
+          : types.has("Price objection")
+            ? "Arrange a staff-led value review using approved product information"
+            : customer.productGap
+              ? `Offer a staff-led review of ${customer.productGap} using the approved catalogue`
+              : "Complete an evidence-led customer follow-up";
+      const stableSeedId =
+        customerId === "CUS-1001"
+          ? "REC-001"
+          : customerId === "CUS-1002"
+            ? "REC-002"
+            : undefined;
+      const id =
+        stableSeedId ??
+        `REC-${customerId.replace(/[^A-Z0-9]/gi, "").slice(-6)}-${analysis.id.slice(-6)}`;
+      const calculation =
+        state.datasets[state.activeWorkspace].churnCalculations[customerId];
+      const record: RecommendationRecord = {
+        id,
+        datasetId: state.activeWorkspace,
+        sourceType: "AVO Analysis",
+        customerId,
+        analysisId: analysis.id,
+        action,
+        explanation: analysis.summary,
+        priority:
+          calculation?.risk === "Critical"
+            ? "Urgent"
+            : calculation?.risk === "High"
+              ? "High"
+              : calculation?.risk === "Medium"
+                ? "Medium"
+                : "Low",
+        status: "Draft",
+        channel: customer.preferredChannel,
+        confidence: `${analysis.confidence}%`,
+        uncertainty:
+          "This recommendation is a draft inference. Staff must validate current customer context and policy before submission.",
+        owner: customer.staff,
+        deadline: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10),
+        evidenceIds: analysis.evidenceIds,
+        createdAt: timestamp(),
+      };
+      update((current) => ({
+        ...current,
+        recommendations: [
+          record,
+          ...current.recommendations.filter((item) => item.id !== id),
+        ],
+        recommendationStatuses: {
+          ...current.recommendationStatuses,
+          [id]: "Draft",
+        },
+        events: [
+          createEvent(
+            current,
+            "Customer-specific recommendation created",
+            `${id} / ${customerId} / ${analysis.id}`,
+            "Draft",
+            `Based on ${analysis.evidenceIds.length} validated evidence references`,
+          ),
+          ...current.events,
+        ],
+      }));
+      return record;
+    },
+    [createEvent, persistence.actor, persistence.authenticated, state, update],
   );
 
   const submitRecommendation = useCallback(
@@ -234,14 +617,63 @@ export function DemoWorkflowProvider({
       owner: string,
       deadline: string,
     ) => {
-      const existing = state.actions.find(
+      let existing = state.actions.find(
         (item) => item.recommendationId === recommendationId,
       );
-      if (!existing) throw new Error("Linked retention action was not found");
+      const recommendation = state.recommendations.find(
+        (item) => item.id === recommendationId,
+      );
+      if (!recommendation) throw new Error("Recommendation was not found");
+      const customer = state.datasets[state.activeWorkspace].customers.find(
+        (item) => item.id === recommendation.customerId,
+      );
+      if (!customer) throw new Error("Linked customer was not found");
+      if (!existing) {
+        const at = timestamp();
+        existing = {
+          id: `ACT-${Date.now()}`,
+          datasetId: state.activeWorkspace,
+          sourceType: "AVO Recommendation",
+          recommendationId,
+          alertId:
+            state.datasets[state.activeWorkspace].alerts.find(
+              (item) => item.customerId === customer.id && item.status === "Active",
+            )?.id ?? "No active alert",
+          customerId: customer.id,
+          customerName: customer.name,
+          tier: customer.tier,
+          risk: customer.risk,
+          recommendation: recommendation.action,
+          explanation: recommendation.explanation,
+          priority: recommendation.priority,
+          actionType: recommendation.channel,
+          owner,
+          approver: "Farah Chen",
+          requester: actorForRole(state.role),
+          deadline,
+          status: "Draft",
+          approvalStatus: "Not submitted",
+          executionStatus: "Not started",
+          confidence: recommendation.confidence,
+          uncertainty: recommendation.uncertainty,
+          evidence: recommendation.evidenceIds,
+          originalAvoOutput: recommendation.action,
+          humanEditedOutput: draft,
+          reviewerComment: "",
+          rejectionReason: "",
+          outcome: "",
+          customerResponse: "",
+          versions: [{ version: 1, content: draft, actor: actorForRole(state.role), at }],
+          history: [{ status: "Draft", actor: actorForRole(state.role), role: state.role, comment: "Action created from customer-specific recommendation", at }],
+        };
+      }
       if (
         !accessibleCustomers(
           state.datasets[state.activeWorkspace].customers,
           state.role,
+          state.activeWorkspace === "imported" && persistence.authenticated
+            ? persistence.actor
+            : undefined,
         ).some((customer) => customer.id === existing.customerId)
       )
         throw new Error("Customer access denied");
@@ -266,6 +698,7 @@ export function DemoWorkflowProvider({
         history: [
           ...existing.history,
           {
+            fromStatus: "Draft",
             status: "Pending Approval",
             actor: actorForRole(state.role),
             role: state.role,
@@ -276,8 +709,15 @@ export function DemoWorkflowProvider({
       };
       update((current) => ({
         ...current,
-        actions: current.actions.map((item) =>
-          item.id === submitted.id ? submitted : item,
+        actions: current.actions.some((item) => item.id === submitted.id)
+          ? current.actions.map((item) =>
+              item.id === submitted.id ? submitted : item,
+            )
+          : [submitted, ...current.actions],
+        recommendations: current.recommendations.map((item) =>
+          item.id === recommendationId
+            ? { ...item, status: "Submitted" }
+            : item,
         ),
         recommendationStatuses: {
           ...current.recommendationStatuses,
@@ -296,7 +736,7 @@ export function DemoWorkflowProvider({
       }));
       return submitted;
     },
-    [createEvent, state, update],
+    [actorForRole, createEvent, persistence.actor, persistence.authenticated, state, update],
   );
   const reviewAction = useCallback(
     (
@@ -344,6 +784,7 @@ export function DemoWorkflowProvider({
                 history: [
                   ...candidate.history,
                   {
+                    fromStatus: "Pending Approval",
                     status: decision,
                     actor,
                     role: state.role,
@@ -355,18 +796,21 @@ export function DemoWorkflowProvider({
             : candidate,
         ) as RetentionActionRecord[],
         events: [
-          createEvent(
+          {
+            ...createEvent(
             current,
             `Retention action ${decision.toLowerCase()}`,
             actionId,
             decision,
             `Pending Approval -> ${decision === "Approved" ? "Approved and Ready" : decision}; ${comment}`,
-          ),
+            ),
+            reviewerComment: comment,
+          },
           ...current.events,
         ],
       }));
     },
-    [createEvent, state, update],
+    [actorForRole, createEvent, state, update],
   );
   const beginRevision = useCallback(
     (actionId: string) => {
@@ -392,6 +836,7 @@ export function DemoWorkflowProvider({
                 history: [
                   ...candidate.history,
                   {
+                    fromStatus: "Changes Requested",
                     status: "Draft Revision",
                     actor: actorForRole(state.role),
                     role: state.role,
@@ -414,7 +859,7 @@ export function DemoWorkflowProvider({
         ],
       }));
     },
-    [createEvent, state, update],
+    [actorForRole, createEvent, state, update],
   );
 
   const startAction = useCallback(
@@ -440,6 +885,7 @@ export function DemoWorkflowProvider({
                 history: [
                   ...candidate.history,
                   {
+                    fromStatus: "Approved and Ready",
                     status: "In Progress",
                     actor,
                     role: state.role,
@@ -462,7 +908,7 @@ export function DemoWorkflowProvider({
         ],
       }));
     },
-    [createEvent, state, update],
+    [actorForRole, createEvent, state, update],
   );
 
   const executeAction = useCallback(
@@ -499,7 +945,8 @@ export function DemoWorkflowProvider({
                 history: [
                   ...candidate.history,
                   {
-                    status: "Execution Confirmed",
+                    fromStatus: "In Progress",
+                    status,
                     actor,
                     role: state.role,
                     comment:
@@ -525,7 +972,7 @@ export function DemoWorkflowProvider({
         ],
       }));
     },
-    [createEvent, state, update],
+    [actorForRole, createEvent, state, update],
   );
 
   const recordResponse = useCallback(
@@ -534,9 +981,11 @@ export function DemoWorkflowProvider({
       const item = state.actions.find((candidate) => candidate.id === actionId);
       if (!item || item.status !== "Waiting for Customer")
         throw new Error("Action is not waiting for a customer response");
+      const actor = actorForRole(state.role);
+      if (!canOwnerOperate(state.role, actor, item.owner))
+        throw new Error("Only the assigned action owner can record a customer response");
       assertActionTransition(item.status, "Outcome Required");
-      const at = timestamp(),
-        actor = actorForRole(state.role);
+      const at = timestamp();
       update((current) => {
         const workspace = current.activeWorkspace;
         const dataset = current.datasets[workspace];
@@ -563,6 +1012,14 @@ export function DemoWorkflowProvider({
         return {
           ...current,
           datasets: { ...current.datasets, [workspace]: recalculated },
+          marketingOpportunities: [
+            ...current.marketingOpportunities.filter((item) => item.datasetId !== workspace),
+            ...calculateMarketingOpportunities(
+              recalculated,
+              current.thresholds,
+              current.marketingOpportunities.filter((item) => item.datasetId === workspace),
+            ),
+          ],
           actions: current.actions.map((candidate) =>
             candidate.id === actionId
               ? {
@@ -572,6 +1029,7 @@ export function DemoWorkflowProvider({
                   history: [
                     ...candidate.history,
                     {
+                      fromStatus: "Waiting for Customer",
                       status: "Outcome Required",
                       actor,
                       role: state.role,
@@ -595,7 +1053,7 @@ export function DemoWorkflowProvider({
         };
       });
     },
-    [createEvent, state, update],
+    [actorForRole, createEvent, state, update],
   );
 
   const recordOutcome = useCallback(
@@ -606,9 +1064,11 @@ export function DemoWorkflowProvider({
         throw new Error(
           "Execution must be confirmed before recording an outcome",
         );
+      const actor = actorForRole(state.role);
+      if (!canOwnerOperate(state.role, actor, item.owner))
+        throw new Error("Only the assigned action owner can record an outcome");
       assertActionTransition(item.status, "Completed");
-      const at = timestamp(),
-        actor = actorForRole(state.role);
+      const at = timestamp();
       update((current) => {
         const workspace = current.activeWorkspace,
           dataset = current.datasets[workspace];
@@ -641,6 +1101,14 @@ export function DemoWorkflowProvider({
         return {
           ...current,
           datasets: { ...current.datasets, [workspace]: recalculated },
+          marketingOpportunities: [
+            ...current.marketingOpportunities.filter((item) => item.datasetId !== workspace),
+            ...calculateMarketingOpportunities(
+              recalculated,
+              current.thresholds,
+              current.marketingOpportunities.filter((item) => item.datasetId === workspace),
+            ),
+          ],
           actions: current.actions.map((candidate) =>
             candidate.id === actionId
               ? {
@@ -652,6 +1120,7 @@ export function DemoWorkflowProvider({
                   history: [
                     ...candidate.history,
                     {
+                      fromStatus: "Outcome Required",
                       status: "Completed",
                       actor,
                       role: state.role,
@@ -675,7 +1144,7 @@ export function DemoWorkflowProvider({
         };
       });
     },
-    [createEvent, state, update],
+    [actorForRole, createEvent, state, update],
   );
 
   const storeAnalysis = useCallback(
@@ -719,6 +1188,18 @@ export function DemoWorkflowProvider({
         return {
           ...current,
           datasets: { ...current.datasets, [workspace]: stored.dataset },
+          marketingOpportunities: [
+            ...current.marketingOpportunities.filter(
+              (item) => item.datasetId !== workspace,
+            ),
+            ...calculateMarketingOpportunities(
+              stored.dataset,
+              current.thresholds,
+              current.marketingOpportunities.filter(
+                (item) => item.datasetId === workspace,
+              ),
+            ),
+          ],
           events: [
             createEvent(
               current,
@@ -753,6 +1234,18 @@ export function DemoWorkflowProvider({
         return {
           ...current,
           datasets: { ...current.datasets, [workspace]: result.dataset },
+          marketingOpportunities: [
+            ...current.marketingOpportunities.filter(
+              (item) => item.datasetId !== workspace,
+            ),
+            ...calculateMarketingOpportunities(
+              result.dataset,
+              current.thresholds,
+              current.marketingOpportunities.filter(
+                (item) => item.datasetId === workspace,
+              ),
+            ),
+          ],
           events: [
             createEvent(
               current,
@@ -770,18 +1263,184 @@ export function DemoWorkflowProvider({
 
   const updateCampaign = useCallback(
     (patch: Partial<CampaignDraft>) =>
+      update((current) => {
+        if (!["Administrator", "Marketing Manager"].includes(current.role))
+          throw new Error("Marketing Manager or Administrator role is required");
+        let campaign = { ...current.campaign, ...patch };
+        const opportunity = current.marketingOpportunities.find(
+          (item) => item.id === campaign.triggerId,
+        );
+        if (opportunity) {
+          const audience = calculateCampaignAudience(
+            current.datasets[campaign.datasetId],
+            opportunity,
+            campaign.channels,
+          );
+          campaign = {
+            ...campaign,
+            totalAudience: audience.total,
+            consentedAudience: audience.includedCustomerIds.length,
+            excludedAudience: audience.exclusions.length,
+            includedCustomerIds: audience.includedCustomerIds,
+            exclusions: audience.exclusions,
+            audienceCalculatedAt: timestamp(),
+          };
+        } else if (campaign.audienceRegion && campaign.audienceIndustry) {
+          const audience = calculateSegmentAudience(
+            current.datasets[campaign.datasetId],
+            campaign.audienceRegion,
+            campaign.audienceIndustry,
+            campaign.channels,
+          );
+          campaign = {
+            ...campaign,
+            segment: `${campaign.audienceRegion} · ${campaign.audienceIndustry}`,
+            totalAudience: audience.total,
+            consentedAudience: audience.includedCustomerIds.length,
+            excludedAudience: audience.exclusions.length,
+            includedCustomerIds: audience.includedCustomerIds,
+            exclusions: audience.exclusions,
+            audienceCalculatedAt: timestamp(),
+          };
+        }
+        const campaigns = current.campaigns.some(
+          (item) => item.id === campaign.id,
+        )
+          ? current.campaigns.map((item) =>
+              item.id === campaign.id ? campaign : item,
+            )
+          : [campaign, ...current.campaigns];
+        return { ...current, campaign, campaigns, activeCampaignId: campaign.id };
+      }),
+    [update],
+  );
+
+  const selectCampaign = useCallback(
+    (campaignId: string) =>
+      update((current) => {
+        const selected = current.campaigns.find((item) => item.id === campaignId);
+        if (!selected) throw new Error("Campaign was not found");
+        return { ...current, campaign: selected, activeCampaignId: campaignId };
+      }),
+    [update],
+  );
+
+  const openCampaignFromOpportunity = useCallback(
+    (opportunityId: string) => {
+      let opened!: CampaignDraft;
+      update((current) => {
+        if (!["Administrator", "Marketing Manager"].includes(current.role))
+          throw new Error("Marketing Manager or Administrator role is required");
+        const opportunity = current.marketingOpportunities.find(
+          (item) =>
+            item.id === opportunityId && item.datasetId === current.activeWorkspace,
+        );
+        if (!opportunity) throw new Error("Marketing opportunity was not found");
+        const existing = current.campaigns.find(
+          (item) => item.triggerId === opportunityId,
+        ) ?? (current.campaign.triggerId === opportunityId ? current.campaign : undefined);
+        if (existing) {
+          opened = existing;
+          return {
+            ...current,
+            campaign: existing,
+            campaigns: current.campaigns.some((item) => item.id === existing.id)
+              ? current.campaigns
+              : [existing, ...current.campaigns],
+            activeCampaignId: existing.id,
+          };
+        }
+        const channels = ["LinkedIn", "Email"];
+        const audience = calculateCampaignAudience(
+          current.datasets[opportunity.datasetId],
+          opportunity,
+          channels,
+        );
+        const id = opportunity.id === "MKT-003" ? "CAM-003" : `CAM-${Date.now()}`;
+        const actor = actorForRole(current.role);
+        opened = {
+          ...current.campaign,
+          id,
+          datasetId: opportunity.datasetId,
+          sourceType: "Calculated Opportunity",
+          triggerId: opportunity.id,
+          status: "Draft",
+          step: 1,
+          name: `${opportunity.region} value clarity`,
+          objective: `Re-engage consented ${opportunity.region} ${opportunity.industry} customers with approved product education`,
+          problem: `${opportunity.affectedPercentage}% of the segment meets a calculated decline or risk threshold.`,
+          segment: `${opportunity.region} · ${opportunity.industry}`,
+          audienceRegion: opportunity.region,
+          audienceIndustry: opportunity.industry,
+          channels,
+          totalAudience: audience.total,
+          consentedAudience: audience.includedCustomerIds.length,
+          excludedAudience: audience.exclusions.length,
+          includedCustomerIds: audience.includedCustomerIds,
+          exclusions: audience.exclusions,
+          audienceCalculatedAt: timestamp(),
+          generated: false,
+          versions: [],
+          confirmations: {},
+          requester: actor,
+          reviewerComment: "",
+          approvalHistory: [{ status: "Draft", actor, role: current.role, comment: `Campaign opened from calculated ${opportunity.id}`, at: timestamp() }],
+        };
+        return {
+          ...current,
+          campaign: opened,
+          campaigns: [opened, ...current.campaigns.filter((item) => item.id !== id)],
+          activeCampaignId: id,
+          events: [
+            createEvent(current, "Campaign created from calculated opportunity", `${id} / ${opportunity.id}`, "Draft"),
+            ...current.events,
+          ],
+        };
+      });
+      return opened;
+    },
+    [actorForRole, createEvent, update],
+  );
+
+  const setOpportunityStatus = useCallback(
+    (
+      opportunityId: string,
+      status: "Active" | "Monitoring" | "Dismissed",
+      reason = "",
+    ) => {
+      if (!["Administrator", "Marketing Manager"].includes(state.role))
+        throw new Error("Marketing Manager or Administrator role is required");
+      if (status === "Dismissed" && !reason.trim())
+        throw new Error("A dismissal reason is required");
       update((current) => ({
         ...current,
-        campaign: { ...current.campaign, ...patch },
-      })),
-    [update],
+        marketingOpportunities: current.marketingOpportunities.map((item) =>
+          item.id === opportunityId
+            ? { ...item, status, dismissalReason: reason.trim() || undefined }
+            : item,
+        ),
+        events: [
+          createEvent(current, "Marketing opportunity status changed", opportunityId, status, reason),
+          ...current.events,
+        ],
+      }));
+    },
+    [createEvent, state.role, update],
   );
 
   const addScheduledPosts = useCallback(
     (posts: ScheduledPostRecord[]) =>
-      update((current) => ({
+      update((current) => {
+        if (!["Administrator", "Marketing Manager"].includes(current.role))
+          throw new Error("Marketing Manager or Administrator role is required");
+        return ({
         ...current,
         campaign: { ...current.campaign, status: "Scheduled", step: 7 },
+        campaigns: current.campaigns.map((item) =>
+          item.id === current.campaign.id
+            ? { ...current.campaign, status: "Scheduled", step: 7 }
+            : item,
+        ),
         scheduledPosts: [
           ...posts,
           ...current.scheduledPosts.filter(
@@ -800,7 +1459,8 @@ export function DemoWorkflowProvider({
           ),
           ...current.events,
         ],
-      })),
+        });
+      }),
     [createEvent, update],
   );
 
@@ -808,10 +1468,21 @@ export function DemoWorkflowProvider({
     () => ({
       state,
       hydrated,
+      persistence,
+      signOut: async () => {
+        const client = getSupabaseBrowserClient();
+        if (client) await client.auth.signOut();
+        databaseUser.current = null;
+        databaseActor.current = "";
+        window.location.assign("/login");
+      },
       dataset: state.datasets[state.activeWorkspace],
       accessibleCustomers: accessibleCustomers(
         state.datasets[state.activeWorkspace].customers,
         state.role,
+        state.activeWorkspace === "imported" && persistence.authenticated
+          ? persistence.actor
+          : undefined,
       ),
       accessibleActions: accessibleActions(
         state.actions.filter(
@@ -819,12 +1490,18 @@ export function DemoWorkflowProvider({
         ),
         state.datasets[state.activeWorkspace].customers,
         state.role,
+        state.activeWorkspace === "imported" && persistence.authenticated
+          ? persistence.actor
+          : undefined,
       ),
       lookupCustomer: (customerId) =>
         lookupAccessibleCustomer(
           state.datasets[state.activeWorkspace].customers,
           state.role,
           customerId,
+          state.activeWorkspace === "imported" && persistence.authenticated
+            ? persistence.actor
+            : undefined,
         ),
       switchWorkspace: (workspace) =>
         update((current) => ({
@@ -836,14 +1513,18 @@ export function DemoWorkflowProvider({
           ],
         })),
       setRole: (role) =>
-        update((current) => ({
-          ...current,
-          role,
-          events: [
-            createEvent(current, "Demo role switched", role, "Success"),
-            ...current.events,
-          ],
-        })),
+        update((current) => {
+          if (current.activeWorkspace === "imported" && persistence.authenticated)
+            throw new Error("Imported Workspace role is controlled by Supabase authentication");
+          return {
+            ...current,
+            role,
+            events: [
+              createEvent(current, "Demo role switched", role, "Success"),
+              ...current.events,
+            ],
+          };
+        }),
       update,
       log,
       addImport,
@@ -855,14 +1536,19 @@ export function DemoWorkflowProvider({
       recordResponse,
       recordOutcome,
       storeAnalysis,
+      createRecommendation,
       recalculate,
       updateCampaign,
+      openCampaignFromOpportunity,
+      selectCampaign,
+      setOpportunityStatus,
       addScheduledPosts,
       reset: () => {
         setState((current) => {
           const fresh = createInitialDemoState(audits);
           return {
             ...fresh,
+            campaigns: [fresh.campaign],
             datasets: {
               ...fresh.datasets,
               imported: current.datasets.imported,
@@ -884,6 +1570,7 @@ export function DemoWorkflowProvider({
     [
       state,
       hydrated,
+      persistence,
       update,
       createEvent,
       log,
@@ -896,8 +1583,12 @@ export function DemoWorkflowProvider({
       recordResponse,
       recordOutcome,
       storeAnalysis,
+      createRecommendation,
       recalculate,
       updateCampaign,
+      openCampaignFromOpportunity,
+      selectCampaign,
+      setOpportunityStatus,
       addScheduledPosts,
     ],
   );

@@ -7,6 +7,7 @@ import {
   type OperationalDataset,
   type WorkspaceKind,
 } from "./operational";
+import { calculateMarketingOpportunities } from "./marketing-operational";
 
 export type ActionStatus =
   | "Draft"
@@ -32,11 +33,68 @@ export type CampaignStatus =
   | "Cancelled";
 
 export interface ApprovalHistoryItem {
+  fromStatus?: string;
   status: string;
   actor: string;
   role: string;
   comment: string;
   at: string;
+}
+
+export interface RecommendationRecord {
+  id: string;
+  datasetId: WorkspaceKind;
+  sourceType: string;
+  customerId: string;
+  analysisId: string;
+  action: string;
+  explanation: string;
+  priority: "Urgent" | "High" | "Medium" | "Low";
+  status: "Draft" | "Submitted" | "Superseded";
+  channel: string;
+  confidence: string;
+  uncertainty: string;
+  owner: string;
+  deadline: string;
+  evidenceIds: string[];
+  createdAt: string;
+}
+
+export type OpportunityStatus = "Active" | "Monitoring" | "Dismissed" | "Resolved";
+
+export interface MarketingOpportunityRecord {
+  id: string;
+  datasetId: WorkspaceKind;
+  segmentKey: string;
+  region: string;
+  industry: string;
+  title: string;
+  status: OpportunityStatus;
+  totalCustomers: number;
+  affectedCustomerIds: string[];
+  affectedPercentage: number;
+  baselineRevenue: number;
+  currentRevenue: number;
+  revenueDecline: number;
+  frequencyDecline: number;
+  engagementDecline: number;
+  commonDrivers: string[];
+  evidence: string[];
+  confidence: "Low" | "Medium" | "High";
+  uncertainty: string;
+  reasons: string[];
+  calculationVersion: string;
+  baselinePeriod: string;
+  currentPeriod: string;
+  calculatedAt: string;
+  nextEvaluationAt: string;
+  signature: string;
+  dismissalReason?: string;
+}
+
+export interface AudienceExclusion {
+  customerId: string;
+  reason: string;
 }
 
 export interface RetentionActionRecord {
@@ -118,9 +176,14 @@ export interface CampaignDraft {
   startDate: string;
   endDate: string;
   segment: string;
+  audienceRegion: string;
+  audienceIndustry: string;
   totalAudience: number;
   consentedAudience: number;
   excludedAudience: number;
+  includedCustomerIds: string[];
+  exclusions: AudienceExclusion[];
+  audienceCalculatedAt: string;
   sources: string[];
   generated: boolean;
   content: Record<string, string>;
@@ -156,6 +219,26 @@ export interface ScheduledPostRecord {
   publisherId: string;
   triggerId: string;
   owner: string;
+  simulated: boolean;
+  updatedAt: string;
+}
+
+export interface CampaignResultRecord {
+  id: string;
+  datasetId: WorkspaceKind;
+  sourceType: string;
+  campaignId: string;
+  campaignName: string;
+  channel: string;
+  status: string;
+  audienceSize: number;
+  impressions: number;
+  clicks: number;
+  responses: number;
+  conversions: number;
+  revenue: number;
+  recordedAt: string;
+  sourceFileName: string;
 }
 
 export interface WalkthroughState {
@@ -171,10 +254,15 @@ export interface DemoWorkflowState {
   lastImportSummary?: ImportCommitSummary;
   role: Role;
   recommendationStatuses: Record<string, string>;
+  recommendations: RecommendationRecord[];
   actions: RetentionActionRecord[];
   imports: ImportHistoryRecord[];
   campaign: CampaignDraft;
+  campaigns: CampaignDraft[];
+  activeCampaignId?: string;
+  marketingOpportunities: MarketingOpportunityRecord[];
   scheduledPosts: ScheduledPostRecord[];
+  campaignResults: CampaignResultRecord[];
   events: AuditEvent[];
   requests: string[];
   dismissedTriggers: string[];
@@ -328,11 +416,36 @@ const campaignContent = {
     "Understand the documented planning views and decide whether the product fits your workflow.",
 };
 
+const recommendation = (
+  id: string,
+  customerId: string,
+  action: string,
+  priority: RecommendationRecord["priority"],
+  owner: string,
+): RecommendationRecord => ({
+  id,
+  datasetId: "demo",
+  sourceType: "Demo Seed",
+  customerId,
+  analysisId: "DEMO-SEED",
+  action,
+  explanation: "Evidence-linked customer context requires a governed staff response.",
+  priority,
+  status: id === "REC-003" ? "Submitted" : "Draft",
+  channel: "WhatsApp",
+  confidence: "Medium",
+  uncertainty: "Customer response and future behaviour remain uncertain.",
+  owner,
+  deadline: "2026-07-24",
+  evidenceIds: customerId === "CUS-1001" ? ["MSG-A-101", "MSG-A-103", "MSG-A-104"] : [],
+  createdAt: now,
+});
+
 export function createInitialDemoState(
   seedEvents: AuditEvent[],
 ): DemoWorkflowState {
-  return {
-    version: 3,
+  const initial: DemoWorkflowState = {
+    version: 5,
     activeWorkspace: "demo",
     datasets: {
       demo: createDataset("demo", seedCustomers),
@@ -344,6 +457,11 @@ export function createInitialDemoState(
       "REC-002": "Draft",
       "REC-003": "Executed",
     },
+    recommendations: [
+      recommendation("REC-001", "CUS-1001", "Resolve both delivery complaints before any promotion", "Urgent", "Aisha Rahman"),
+      recommendation("REC-002", "CUS-1002", "Introduce Analytics Suite from the approved catalogue", "Medium", "Daniel Wong"),
+      recommendation("REC-003", "CUS-1004", "Complete recovery check-in", "Low", "Daniel Wong"),
+    ],
     actions: [
       action(
         "ACT-021",
@@ -473,9 +591,14 @@ export function createInitialDemoState(
       startDate: "2026-07-24",
       endDate: "2026-07-30",
       segment: "North · Food & beverage",
+      audienceRegion: "North",
+      audienceIndustry: "Food & beverage",
       totalAudience: 12,
-      consentedAudience: 8,
-      excludedAudience: 4,
+      consentedAudience: seedCustomers.filter((customer) => customer.region === "North" && customer.industry === "Food & beverage" && customer.consent && customer.email).length,
+      excludedAudience: seedCustomers.filter((customer) => customer.region === "North" && customer.industry === "Food & beverage" && (!customer.consent || !customer.email)).length,
+      includedCustomerIds: seedCustomers.filter((customer) => customer.region === "North" && customer.industry === "Food & beverage" && customer.consent && customer.email).map((customer) => customer.id),
+      exclusions: seedCustomers.filter((customer) => customer.region === "North" && customer.industry === "Food & beverage" && (!customer.consent || !customer.email)).map((customer) => ({ customerId: customer.id, reason: !customer.consent ? "Marketing consent is withdrawn or missing" : "Email channel selected but no email address is available" })),
+      audienceCalculatedAt: new Date().toISOString(),
       sources: [
         "product-catalogue.pdf · page 1",
         "marketing-guidelines.pdf · page 1",
@@ -501,6 +624,12 @@ export function createInitialDemoState(
       timeZone: "Asia/Kuala_Lumpur",
       publisher: "Demo Publisher",
     },
+    campaigns: [],
+    activeCampaignId: "CAM-003",
+    marketingOpportunities: calculateMarketingOpportunities(
+      createDataset("demo", seedCustomers),
+      { riskSegment: 20, revenue: 15, frequency: 20, engagement: 25 },
+    ),
     scheduledPosts: [
       {
         datasetId: "demo",
@@ -518,6 +647,8 @@ export function createInitialDemoState(
         publisherId: "not-scheduled",
         triggerId: "MKT-001",
         owner: "Nadia Wong",
+        simulated: true,
+        updatedAt: now,
       },
       {
         datasetId: "demo",
@@ -535,8 +666,11 @@ export function createInitialDemoState(
         publisherId: "not-scheduled",
         triggerId: "MKT-002",
         owner: "Nadia Wong",
+        simulated: true,
+        updatedAt: now,
       },
     ],
+    campaignResults: [],
     events: seedEvents,
     requests: [],
     dismissedTriggers: [],
@@ -550,6 +684,8 @@ export function createInitialDemoState(
     },
     walkthrough: { active: false, scenario: null, step: 0 },
   };
+  initial.campaigns = [initial.campaign];
+  return initial;
 }
 
 export const actorForRole = (role: Role) =>

@@ -18,6 +18,14 @@ const phase2Sql = readFileSync(
   "utf8",
 ).toLowerCase();
 
+const workspaceSql = readFileSync(
+  path.join(
+    process.cwd(),
+    "supabase/migrations/202607190003_operational_workspace.sql",
+  ),
+  "utf8",
+).toLowerCase();
+
 const requiredTables = [
   "organizations",
   "profiles",
@@ -97,5 +105,15 @@ describe("Supabase security migration", () => {
     expect(phase2Sql).not.toMatch(
       /on public\.audit_logs\s+for (update|delete)/,
     );
+  });
+
+  it("adds authenticated durable workspace persistence and append-only audit insertion", () => {
+    expect(workspaceSql).toContain("create table if not exists public.operational_workspace_states");
+    expect(workspaceSql).toContain("operational_workspace_authorized_update");
+    expect(workspaceSql).toContain("updated_by = auth.uid()");
+    expect(workspaceSql).toContain("audit_authenticated_insert");
+    expect(workspaceSql).not.toMatch(/on public\.audit_logs\s+for (update|delete)/);
+    expect(workspaceSql).toContain("handle_customerpulse_user");
+    expect(workspaceSql).toContain("'account_executive'");
   });
 });

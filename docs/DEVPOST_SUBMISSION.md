@@ -1,121 +1,88 @@
 # Devpost submission
 
-## Project tagline
+## 1. Tagline
 
 Turn customer evidence into explainable, human-approved retention and marketing action.
 
-## Concise description
+## 2. Concise description
 
-CustomerPulse AI is a governed customer-retention and marketing-intelligence workspace. It combines deterministic customer tiering and hybrid churn scoring with AVO, an evidence-linked assistant that analyses authorised conversations, explains risk, and creates editable recommendations and campaign drafts. Employees verify the evidence, managers approve material actions, and the application enforces consent before outreach or simulated publishing.
+CustomerPulse AI is a governed customer-retention and marketing workspace. It combines imported customer, transaction and authorised-conversation evidence; deterministic tier, churn and revenue-at-risk calculations; evidence-linked AVO analysis; and human approval, consent and audit controls. Outcomes feed back into the operational record instead of ending as a static recommendation.
 
-## Inspiration
+## 3. Inspiration
 
-Customer risk signals are often scattered across transactions, complaints, conversations, missed follow-ups, and campaign results. Account teams can discover those signals too late, while marketing teams may see a declining segment without a safe path from evidence to action. We wanted to connect those fragments without turning an AI model into the final decision-maker.
+Risk signals are often fragmented across purchases, complaints, conversations and missed follow-ups. Teams can discover churn too late, while marketing may act on an unexplained segment label or an unsafe audience count. We wanted one usable path from evidence to governed action without making an AI model the final decision-maker.
 
-## What it does
+## 4. What it does
 
-- Presents a Customer 360 view with tier, churn risk, revenue at risk, trends, conversations, alerts, actions, campaigns, and source-linked evidence.
-- Validates CSV, XLSX, JSON, TXT, PDF, DOCX, PNG, and JPG imports with signature and size checks, previews, column mapping, required-field validation, duplicate detection, error reports, and confirmation.
-- Calculates explainable customer tiers and hybrid churn risk using deterministic application logic.
-- Runs AVO conversation analysis with evidence IDs, confidence, uncertainty, abstention, and prompt-injection handling.
-- Lets staff edit AVO recommendations, provide feedback, and submit actions for human approval.
-- Prevents AVO or requesters from self-approving and requires the correct manager role, reviewer comments, rejection reasons, approval before execution, and consent before outreach.
-- Detects segment decline and supports a source-grounded campaign workflow through Marketing Manager approval and the clearly simulated Demo Publisher.
-- Provides analytics, governance controls, approval timelines, searchable audit records, CSV export, and printable reports.
-- Includes four synthetic scenarios and a visible Synthetic Demo Data label.
+- Imports and validates operational data, then recalculates customer tier, hybrid churn risk, ERAR-v1 and alerts.
+- Gives staff an accessible Customer 360 with current evidence, conversations, alerts, recommendations, actions and audit history.
+- Uses AVO to analyse authorised conversations with source message IDs, confidence and uncertainty, and creates a customer-specific editable recommendation.
+- Enforces changes/revision, different-user approval, separate execution states, consent checks and outcome recording.
+- Calculates segment opportunities from current data and creates consent/channel-filtered campaign audiences.
+- Supports a seven-step campaign, campaign-specific approval/history, Demo Publisher scheduling, calendar management, publish confirmation and imported results.
+- Uses Supabase Auth/RLS/Realtime persistence for Imported Workspace and a resettable synthetic Demo Workspace for judging.
 
-## How it was built
+## 5. How it was built
 
-The application uses Next.js App Router, React, and TypeScript. Domain logic is separated into deterministic tier, churn, consent, segment-trigger, approval, import, AVO-provider, and publisher modules. The server exposes routes for health checks, AVO analysis, file validation, demo-file downloads, publishing, and trackable landing pages.
+The UI and server use Next.js App Router, React and strict TypeScript. Domain modules isolate import validation, deterministic tier/churn/ERAR, alerts, marketing calculations, approvals, AVO providers and publishers. Supabase stores Imported Workspace entities as role-scoped JSONB records and append-only audit rows. The AVO server route authenticates imported-customer access before sending only authorised evidence to an OpenAI-compatible provider; validated fallback output is explicitly labelled.
 
-AVO uses an `AIProvider` interface with `OpenAIProvider` and `DemoAVOProvider`. The live provider constructs a strict structured-output request for the OpenAI Responses API, validates the response with Zod, and rejects evidence IDs that are not present in the source messages. The demo provider keeps the application usable without credentials and labels every result **AVO Demo Analysis**.
+## 6. How Codex was used
 
-Publishing uses a `SocialPublisher` interface with `BufferPublisher` and `DemoSocialPublisher`. The verified demonstration uses the Demo Publisher, which enforces approval and idempotency and labels the result as simulated. The Buffer adapter is implemented but was not credential-tested.
+Codex was used to inspect and evolve the existing repository; implement the customer, retention, marketing, Supabase and provider changes; generate connected synthetic fixtures; diagnose cross-page contradictions and production-browser failures; build unit and Playwright coverage; run quality/security gates; and maintain the handoff and submission documentation.
 
-A normalized Supabase PostgreSQL migration, RLS policies, seed SQL, and a guarded reset loader are included. The verified no-credential application path uses in-memory session state; the UI is not connected to live Supabase persistence.
+## 7. How GPT-5.6 was used
 
-## How Codex was used
+GPT-5.6 powered the Codex development work in this session. The application runtime does not claim GPT-5.6 inference: its configured live provider is Xiaomi MiMo through an OpenAI-compatible Responses API. When MiMo is unavailable, the deterministic Demo AVO fallback is shown with the attempted provider and reason.
 
-Codex was the primary development environment for the application. It was used to inspect and structure the repository, implement the Next.js interface and server routes, build deterministic domain engines and provider abstractions, generate synthetic fixtures and source documents, create the Supabase schema and reset tooling, diagnose production-only PDF parsing and UI state defects, expand Vitest and Playwright coverage, run the release checks, and produce the technical and submission documentation.
+## 8. Challenges
 
-## How GPT-5.6 was used
+- Replacing seeded conclusions with calculations that still produce a clear demo story.
+- Keeping one authoritative risk/ERAR record across Overview, Customers, Alerts and Analytics.
+- Calculating audiences without accidentally including withdrawn consent or missing channel details.
+- Separating AI assistance from scoring, approval, execution and communication.
+- Persisting a complex workflow across users while enforcing assignment-aware RLS.
+- Finding accessibility and state-timing defects that appeared only in full Playwright workflows.
 
-The application contains a server-side `OpenAIProvider` for the Responses API with `OPENAI_MODEL` defaulting to `gpt-5.6`. It requests a strict JSON schema for conversation analysis, then applies Zod and evidence-ID validation before returning output to the UI. The live request contract was verified with an injected test transport. No external GPT-5.6 call is claimed because an API key was not available; the deployed no-key path uses the explicitly labelled deterministic `DemoAVOProvider`.
+## 9. Accomplishments
 
-## Challenges encountered
+- Converted the marketing workflow from a pre-seeded conclusion into calculated opportunities and audiences.
+- Converted new recommendations into customer/analysis-specific records.
+- Implemented a full retention feedback loop in which recorded outcomes run the real risk engine.
+- Added Supabase Auth, role-aware Imported Workspace persistence, Realtime updates and append-only audit writes.
+- Built connected mixed-risk upload cases covering risk, growth, privacy, abstention, stability and recovery.
+- Reached a verified local baseline of 118 unit tests; final browser/security/production counts are copied from `docs/TESTING.md` only after completion.
 
-- Keeping AI assistance separate from deterministic tiering, churn scoring, consent, commercial facts, approval, and execution.
-- Making fallback behavior useful while never presenting deterministic demo output as GPT-5.6 output.
-- Validating heterogeneous spreadsheet, document, and image imports through one governed workflow.
-- Preserving evidence integrity and treating customer-message instructions as untrusted content.
-- Enforcing approval and consent across both customer outreach and campaign scheduling.
-- Fixing PDF extraction that passed unit tests but initially failed in the optimized production server.
-- Fixing recommendation-local state that did not refresh when switching from one customer recommendation to another.
+## 10. What we learned
 
-## Accomplishments
+Trustworthy AI products need visible boundaries. Evidence must be resolvable, calculation ownership must be clear, provider fallback must be honest, and approval/consent cannot be decorative. A useful workflow also needs feedback: an outcome should update the operational state and future decisions, not merely add a success message.
 
-- Completed a responsive 15-route operational demo with five role views.
-- Created 30 fully synthetic customers and four end-to-end scenarios covering strategic risk, growth opportunity, segment decline, and successful recovery.
-- Kept all required mock imports and grounding assets permanently downloadable and verified all 11 uploadable files through the production import route.
-- Implemented evidence validation, abstention, prompt-injection handling, editable drafts, correction feedback, approval separation, consent enforcement, and auditable workflow events.
-- Passed 47 unit tests, 9 production-browser workflows, linting, strict type checking, the production build, and a dependency audit with zero reported vulnerabilities at verification time.
+## 11. Future development
 
-## What we learned
+- Credential-test Buffer publishing, delivery status and controlled retries.
+- Add real WhatsApp/email ingestion and delivery only with appropriate consent and provider governance.
+- Add CRM connectors, scheduled monitoring and stronger multi-tenant operational testing.
+- Add optional campaign image generation and platform-aware image processing.
+- Replace the JSONB operational adapter with fully normalised domain writes when scale/reporting needs justify the migration.
 
-Useful AI workflow design depends as much on boundaries as generation. Deterministic calculations should remain inspectable, AI claims need resolvable evidence, and material actions need explicit human ownership. A transparent fallback is more trustworthy than implying that a model or external service ran when it did not. Production-browser testing also found failures that unit tests alone did not reveal.
+## 12. Built with
 
-## Future development
+Codex, GPT-5.6 (development), Next.js App Router, React, TypeScript, Xiaomi MiMo OpenAI-compatible API, Zod, Supabase Auth/PostgreSQL/RLS/Realtime, Demo Publisher, Buffer adapter, Recharts, ExcelJS, Papa Parse, pdf-parse, Mammoth, Vitest, Playwright, ESLint, GitHub and Vercel.
 
-- Connect the UI to Supabase Authentication, PostgreSQL persistence, Storage, and live two-tenant RLS testing.
-- Credential-test and complete live Buffer channel discovery, publishing, status retrieval, failure recording, and controlled retries.
-- Run and evaluate live GPT-5.6 analysis when an API key is available.
-- Add Supabase Realtime where it improves approvals and operational status.
-- Add persistent tracking-link analytics and richer outcome reporting.
-- Add optional campaign image generation, crop suggestions, and platform resizing behind feature flags.
-- Explore live communication and CRM connectors only with appropriate consent, security, and approval controls.
+## 13. Demo
 
-## Built with
+Use the under-three-minute script in `docs/DEMO_SCRIPT.md`. It demonstrates Maya’s complete governed retention flow, a calculated and consent-safe marketing campaign, and the real Imported Workspace architecture without claiming unverified external delivery.
 
-- Codex
-- Next.js App Router
-- React
-- TypeScript
-- OpenAI Responses API adapter
-- GPT-5.6 model configuration
-- Zod
-- Supabase PostgreSQL migration, RLS, Auth/Storage SDKs, and seed tooling
-- Buffer GraphQL adapter and Demo Publisher
-- Recharts
-- ExcelJS
-- Mammoth
-- pdf-parse
-- Papa Parse
-- Vitest
-- Playwright
-- ESLint
-- Vercel
+## Devpost checklist
 
-## Verified limitations
-
-- The demonstrated AVO path is deterministic **AVO Demo Analysis**, not a live GPT-5.6 response.
-- Campaign scheduling is simulated by Demo Publisher; no live Buffer publication is claimed.
-- Workflow mutations use in-memory session state and reset on reload; the UI does not yet persist to Supabase.
-- WhatsApp and email use user-initiated deep links; the application does not automatically send private messages.
-- Audit CSV and browser Print/Save as PDF are available; a server-generated audit PDF is not implemented.
-- Image generation, automatic cropping, and platform resizing are not implemented.
-
-## Devpost submission checklist
-
-- [ ] Confirm the public GitHub repository contains the final verified commits.
-- [ ] Add the deployed Vercel URL.
-- [ ] Verify `/api/health` on the deployed URL.
-- [ ] Run the deployed smoke test: import, AVO Demo Analysis, approval, consent block, WhatsApp link, campaign approval, Demo Publisher, analytics, and audit export.
-- [ ] Record and upload a demonstration video under three minutes using `docs/DEMO_SCRIPT.md`.
-- [ ] Add the project tagline and concise description.
-- [ ] Add the inspiration, implementation, challenges, accomplishments, learning, and future-development sections.
-- [ ] Add the built-with technologies, using “adapter” or “demo” qualifiers where shown above.
-- [ ] Copy this Codex conversation's Session ID from the Codex app and add it to the required Devpost field.
-- [ ] Add screenshots that visibly retain the Synthetic Demo Data and AVO Demo Analysis labels.
-- [ ] State that actions remain human-approved and that private messages are not auto-sent.
-- [ ] Do not claim live GPT-5.6, Buffer publishing, or Supabase persistence unless each is separately credential-tested.
-- [ ] Review the final submission for secrets, private customer data, unsupported metrics, and placeholder URLs.
+- [ ] Push the final reviewed commit to the public GitHub repository.
+- [ ] Apply Supabase migration 003 and assign Auth roles.
+- [ ] Redeploy Vercel with Supabase and MiMo variables.
+- [ ] Run the deployed 45-test regression and copy only observed results into the handoff.
+- [ ] Verify `/api/health` and one AVO result’s actual provider/fallback label.
+- [ ] Record a video under three minutes using `docs/DEMO_SCRIPT.md`.
+- [ ] Add production URL, repository URL, screenshots and video URL.
+- [ ] Copy the tagline, description, inspiration, build, challenges, accomplishments, learning and future sections from this file.
+- [ ] Use accurate qualifiers: “Demo Publisher,” “MiMo live” only when returned live, and “Imported Workspace/Supabase” only after migration verification.
+- [ ] Do not claim Buffer/social delivery, WhatsApp/email delivery, CRM sync, image generation or legal certification.
+- [ ] Confirm `.env.local` is ignored and no key is present in Git history/diff.
+- [ ] Complete any hackathon-specific Codex session field in the Codex app; the application repository does not generate a Codex Session ID.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { customers } from "@/lib/demo-data";
 import type { CampaignDraft, ScheduledPostRecord } from "@/lib/demo-workflow";
@@ -255,11 +255,18 @@ export function CampaignStudioV2({
 }) {
   const demo = useDemoWorkflow();
   const campaign = demo.state.campaign;
-  const queryStep = Number(
-    new URLSearchParams(
-      typeof window === "undefined" ? "" : window.location.search,
-    ).get("step"),
+  const query = new URLSearchParams(
+    typeof window === "undefined" ? "" : window.location.search,
   );
+  const requestedCampaignId = query.get("campaignId");
+  const triggerId = query.get("triggerId");
+  const queryStep = Number(query.get("step"));
+  const hasEditorContext = Boolean(requestedCampaignId || triggerId || queryStep);
+  useEffect(() => {
+    if (requestedCampaignId && requestedCampaignId !== campaign.id) {
+      try { demo.selectCampaign(requestedCampaignId); } catch { /* rendered not-found state below */ }
+    }
+  }, [requestedCampaignId, campaign.id, demo]);
   const [step, setStep] = useState(
     queryStep >= 1 && queryStep <= 7 ? queryStep : campaign.step,
   );
@@ -269,6 +276,26 @@ export function CampaignStudioV2({
     campaign.reviewerComment,
   );
   const patch = (value: Partial<CampaignDraft>) => demo.updateCampaign(value);
+  if (!hasEditorContext) {
+    return (
+      <div>
+        <WorkflowGuide title="Campaign Studio" steps={wizardSteps} current={0} expected="Open an existing campaign, create a blank draft, or start from a calculated Marketing Intelligence opportunity." />
+        <section className="card">
+          <div className="card-head"><h2>Campaigns</h2><button className="btn btn-primary" disabled={role === "Auditor"} title={role === "Auditor" ? "Auditor access is read-only" : ""} onClick={() => {
+            const id = `CAM-${Date.now()}`;
+            const requester = demo.persistence.actor || (role === "Administrator" ? "Demo Administrator" : "Mina Lee");
+            patch({ id, datasetId: demo.state.activeWorkspace, triggerId: "", sourceType: "Staff Draft", status: "Draft", step: 1, name: "", objective: "", problem: "", expectedOutcome: "", segment: "", audienceRegion: "", audienceIndustry: "", totalAudience: 0, consentedAudience: 0, excludedAudience: 0, includedCustomerIds: [], exclusions: [], audienceCalculatedAt: new Date().toISOString(), generated: false, versions: [], confirmations: {}, requester, approvalHistory: [{ status: "Draft", actor: requester, role, comment: "Blank campaign created by staff", at: new Date().toISOString() }] });
+            go(`campaign-studio?campaignId=${id}&step=1`);
+          }}>New blank campaign</button></div>
+          <p className="subtle">A navigation entry never assumes an insight. Prefill occurs only when a campaign is opened from Marketing Intelligence.</p>
+          {demo.state.campaigns.filter((item) => item.datasetId === demo.state.activeWorkspace).map((item) => (
+            <button className="queue-row" key={item.id} onClick={() => { demo.selectCampaign(item.id); go(`campaign-studio?campaignId=${item.id}&step=${item.step}`); }}><span><b>{item.id} · {item.name || "Untitled campaign"}</b><small>{item.triggerId ? `From ${item.triggerId}` : "Blank staff draft"}</small></span>{badge(item.status)}</button>
+          ))}
+          <button className="btn btn-outline" onClick={() => go("marketing")}>Open Marketing Intelligence</button>
+        </section>
+      </div>
+    );
+  }
   const missing = validateStep(step, campaign);
   const move = (next: number) => {
     const issue = validateStep(step, campaign);
@@ -289,11 +316,26 @@ export function CampaignStudioV2({
   };
   const generate = () => {
     const version = campaign.versions.length + 1;
+    const sourceSummary = campaign.sources.length
+      ? `Grounded in: ${campaign.sources.join(", ")}.`
+      : "No source selected.";
+    const generatedContent = {
+      "Campaign brief": `${campaign.objective}. Audience: ${campaign.segment}. ${sourceSummary}`,
+      "LinkedIn caption": `${campaign.objective}. Review the approved product information and contact our team for a staff-led discussion.`,
+      "Instagram caption": `${campaign.objective}. Learn more from the approved overview. #CustomerSuccess`,
+      "Facebook caption": `${campaign.objective}. Explore the approved information or ask our team for a walkthrough.`,
+      "Email content": `${campaign.objective}. This message uses approved information only. Reply if you would like a staff-led walkthrough.`,
+      "WhatsApp content": `${campaign.objective}. Reply if you would like an authorised staff member to share the approved overview.`,
+      Hashtags: "#CustomerSuccess #ProductEducation",
+      CTA: "Review the approved product information",
+      "Landing-page content": `${campaign.problem} ${campaign.expectedOutcome} Results are not guaranteed.`,
+    };
     patch({
       generated: true,
+      content: generatedContent,
       versions: [
         ...campaign.versions,
-        { version, at: new Date().toISOString(), content: campaign.content },
+        { version, at: new Date().toISOString(), content: generatedContent },
       ],
     });
     demo.log(
@@ -319,6 +361,7 @@ export function CampaignStudioV2({
       approvalHistory: [
         ...campaign.approvalHistory,
         {
+          fromStatus: campaign.status,
           status: "Pending Approval",
           actor: campaign.requester,
           role: "Marketing Specialist",
@@ -336,7 +379,11 @@ export function CampaignStudioV2({
   };
   const decide = (decision: "Approved" | "Rejected" | "Changes Requested") => {
     const actorName =
-      role === "Administrator" ? "Demo Administrator" : "Mina Lee";
+      demo.persistence.authenticated
+        ? demo.persistence.actor
+        : role === "Administrator"
+          ? "Demo Administrator"
+          : "Mina Lee";
     if (role !== "Marketing Manager" && role !== "Administrator")
       return setError("Marketing Manager or Administrator role is required.");
     if (actorName === campaign.requester)
@@ -353,6 +400,7 @@ export function CampaignStudioV2({
       approvalHistory: [
         ...campaign.approvalHistory,
         {
+          fromStatus: campaign.status,
           status: decision,
           actor: actorName,
           role,
@@ -404,6 +452,7 @@ export function CampaignStudioV2({
             dueAt: `${campaign.scheduleDate}T${campaign.scheduleTime}:00+08:00`,
             approved: true,
             idempotencyKey: `${campaign.id}-${channel}-${campaign.scheduleDate}-${campaign.scheduleTime}`,
+            publisher: campaign.publisher,
           }),
         });
         const data = await response.json();
@@ -430,6 +479,8 @@ export function CampaignStudioV2({
           publisherId: data.id,
           triggerId: campaign.triggerId,
           owner: campaign.requester,
+          simulated: Boolean(data.simulated),
+          updatedAt: new Date().toISOString(),
         });
       }
       demo.addScheduledPosts(posts);
@@ -569,6 +620,19 @@ function WizardStep({
   schedule: () => void;
   go: (path: string) => void;
 }) {
+  const demo = useDemoWorkflow();
+  const [bufferAvailable, setBufferAvailable] = useState(false);
+  const [showVersions, setShowVersions] = useState(false);
+  const [showEvidence, setShowEvidence] = useState(false);
+  useEffect(() => {
+    fetch("/api/health")
+      .then((response) => response.json())
+      .then((health) => {
+        const available = health.publisher === "buffer";
+        setBufferAvailable(available);
+      })
+      .catch(() => setBufferAvailable(false));
+  }, [campaign.id]);
   const field = (key: keyof CampaignDraft, label: string, type = "text") => (
     <label className="field">
       {label}
@@ -631,7 +695,9 @@ function WizardStep({
     return (
       <div>
         <div className="grid two">
-          {field("segment", "Segment")}
+          <label className="field">Audience region<select className="input" value={campaign.audienceRegion} onChange={(event) => patch({ audienceRegion: event.target.value, audienceIndustry: "" })}><option value="">Select region</option>{[...new Set(demo.dataset.customers.map((item) => item.region))].map((value) => <option key={value}>{value}</option>)}</select></label>
+          <label className="field">Audience industry<select className="input" value={campaign.audienceIndustry} onChange={(event) => patch({ audienceIndustry: event.target.value })}><option value="">Select industry</option>{[...new Set(demo.dataset.customers.filter((item) => !campaign.audienceRegion || item.region === campaign.audienceRegion).map((item) => item.industry))].map((value) => <option key={value}>{value}</option>)}</select></label>
+          <Metric label="Calculated segment" value={campaign.segment || "Select region and industry"} />
           <Metric
             label="Estimated audience size"
             value={String(campaign.consentedAudience)}
@@ -654,14 +720,18 @@ function WizardStep({
           />
         </div>
         <h3>Audience preview</h3>
-        {customers
-          .filter((item) => item.region === "North")
-          .slice(0, 4)
+        {demo.dataset.customers
+          .filter((item) => campaign.includedCustomerIds.includes(item.id))
           .map((item) => (
             <div className="evidence" key={item.id}>
-              {item.id} · {item.name} · {item.tier} · {item.risk}
+              {item.id} · {item.name} · {item.tier} · {item.risk} · consent verified
             </div>
           ))}
+        {campaign.exclusions.length > 0 && <h3>Excluded before generation or publishing</h3>}
+        {campaign.exclusions.map((exclusion) => {
+          const customer = demo.dataset.customers.find((item) => item.id === exclusion.customerId);
+          return <div className="evidence" key={exclusion.customerId}><span className="evidence-id">Excluded · {exclusion.customerId}</span>{customer?.name ?? "Customer"} · {exclusion.reason}</div>;
+        })}
       </div>
     );
   if (step === 3)
@@ -675,7 +745,7 @@ function WizardStep({
           "marketing-guidelines.pdf · page 1",
           "Product records · Inventory Optimizer",
           "Campaign asset · existing-campaign.png",
-          "MKT-003 aggregate evidence",
+          `${campaign.triggerId || "Staff-created segment"} aggregate evidence`,
         ].map((source) => (
           <label className="evidence check" key={source}>
             <input
@@ -715,11 +785,14 @@ function WizardStep({
                 ? "Generate another version to compare"
                 : ""
             }
+            onClick={() => setShowVersions((value) => !value)}
           >
             Compare versions ({campaign.versions.length})
           </button>
-          <button className="btn btn-outline">View evidence</button>
+          <button className="btn btn-outline" onClick={() => setShowEvidence((value) => !value)}>View evidence</button>
         </div>
+        {showVersions && campaign.versions.map((version) => <div className="evidence" key={version.version}><span className="evidence-id">Version {version.version} · {new Date(version.at).toLocaleString()}</span><p>{Object.entries(version.content).map(([key, value]) => `${key}: ${value}`).join(" | ")}</p></div>)}
+        {showEvidence && <div className="evidence"><span className="evidence-id">Selected grounding sources</span>{campaign.sources.length ? campaign.sources.map((source) => <div key={source}>{source}</div>) : <p>No sources selected.</p>}</div>}
         <div className="notice">
           Factual validation: content is restricted to selected approved
           sources. No discount or guarantee was generated.
@@ -882,7 +955,7 @@ function WizardStep({
             }
           >
             <option>Demo Publisher</option>
-            <option>Buffer</option>
+            <option disabled={!bufferAvailable}>Buffer{bufferAvailable ? "" : " — Connection required"}</option>
           </select>
         </label>
         {field("scheduleDate", "Schedule date", "date")}
@@ -903,6 +976,7 @@ function WizardStep({
         <b>Final preview:</b> {campaign.name} · {campaign.channels.join(", ")} ·{" "}
         {campaign.scheduleDate} {campaign.scheduleTime} {campaign.timeZone}
       </div>
+      {!bufferAvailable && <div className="notice">Buffer is unavailable because no production connection is configured. Demo Publisher is explicitly selected and creates simulated schedule records only.</div>}
       <button
         className="btn btn-primary"
         disabled={campaign.status !== "Approved"}
@@ -948,25 +1022,38 @@ export function CalendarV2({
   const [view, setView] = useState("Month");
   const [status, setStatus] = useState("All statuses");
   const [channel, setChannel] = useState("All channels");
+  const [campaignFilter, setCampaignFilter] = useState("");
+  const [ownerFilter, setOwnerFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleTime, setRescheduleTime] = useState("");
   const [selected, setSelected] = useState(
     queryId ?? demo.state.scheduledPosts[0]?.campaignId,
   );
   const posts = demo.state.scheduledPosts.filter(
     (item) =>
       (status === "All statuses" || item.status === status) &&
-      (channel === "All channels" || item.channel === channel),
+      (status !== "All statuses" || item.status !== "Cancelled") &&
+      (channel === "All channels" || item.channel === channel) &&
+      (!campaignFilter || `${item.campaignId} ${item.campaignName}`.toLowerCase().includes(campaignFilter.toLowerCase())) &&
+      (!ownerFilter || item.owner.toLowerCase().includes(ownerFilter.toLowerCase())) &&
+      (!dateFilter || item.date === dateFilter),
   );
   const selectedPosts = posts.filter((item) => item.campaignId === selected);
-  const updatePost = (next: "Scheduled" | "Cancelled") => {
+  const updatePost = (next: "Scheduled" | "Published" | "Cancelled", date?: string, time?: string) => {
+    if (demo.state.role === "Auditor") return notify("Auditor access is read-only");
+    if (next === "Scheduled" && (!date || !time)) return notify("A new date and time are required to reschedule");
     demo.update((current) => ({
       ...current,
       scheduledPosts: current.scheduledPosts.map((item) =>
-        item.campaignId === selected ? { ...item, status: next } : item,
+        item.campaignId === selected ? { ...item, status: next, date: date ?? item.date, time: time ?? item.time, updatedAt: new Date().toISOString() } : item,
       ),
+      campaigns: current.campaigns.map((item) => item.id === selected ? { ...item, status: next } : item),
+      campaign: current.campaign.id === selected ? { ...current.campaign, status: next } : current.campaign,
     }));
     demo.log(
       `Scheduled post ${next.toLowerCase()}`,
-      selected ?? "campaign",
+      `${selected ?? "campaign"}${date ? ` · ${date} ${time}` : ""}`,
       next,
     );
     notify(`Campaign ${next.toLowerCase()} and audited`);
@@ -1032,16 +1119,22 @@ export function CalendarV2({
             className="input"
             aria-label="Calendar campaign filter"
             placeholder="Campaign"
+            value={campaignFilter}
+            onChange={(event) => setCampaignFilter(event.target.value)}
           />
           <input
             className="input"
             aria-label="Calendar owner filter"
             placeholder="Owner"
+            value={ownerFilter}
+            onChange={(event) => setOwnerFilter(event.target.value)}
           />
           <input
             className="input"
             aria-label="Calendar date filter"
             type="date"
+            value={dateFilter}
+            onChange={(event) => setDateFilter(event.target.value)}
           />
         </div>
         <div className={`calendar-view ${view.toLowerCase()}`}>
@@ -1084,24 +1177,32 @@ export function CalendarV2({
             </div>
           ))}
           <h3>Approval history</h3>
-          {demo.state.campaign.approvalHistory.map((item, index) => (
+          {(demo.state.campaigns.find((campaign) => campaign.id === selected)?.approvalHistory ?? []).map((item, index) => (
             <div className="evidence" key={`${item.at}-${index}`}>
               {item.status} · {item.actor} · {item.comment}
             </div>
           ))}
+          {demo.state.campaignResults.filter((result) => result.campaignId === selected).length > 0 && <><h3>Imported results</h3>{demo.state.campaignResults.filter((result) => result.campaignId === selected).map((result) => <div className="evidence" key={result.id}><b>{result.channel} · {result.status}</b><p>{result.impressions} impressions · {result.clicks} clicks · {result.responses} responses · {result.conversions} conversions · RM {result.revenue.toLocaleString()}</p><small>{result.sourceFileName} · {result.recordedAt}</small></div>)}</>}
           <div className="top-actions">
+            <input className="input compact" aria-label="Reschedule date" type="date" value={rescheduleDate} onChange={(event) => setRescheduleDate(event.target.value)} />
+            <input className="input compact" aria-label="Reschedule time" type="time" value={rescheduleTime} onChange={(event) => setRescheduleTime(event.target.value)} />
             <button
               className="btn btn-outline"
-              onClick={() => updatePost("Scheduled")}
+              disabled={demo.state.role === "Auditor" || !rescheduleDate || !rescheduleTime}
+              title={demo.state.role === "Auditor" ? "Auditor access is read-only" : !rescheduleDate || !rescheduleTime ? "Choose a new date and time" : ""}
+              onClick={() => updatePost("Scheduled", rescheduleDate, rescheduleTime)}
             >
               Reschedule
             </button>
             <button
               className="btn btn-danger"
+              disabled={demo.state.role === "Auditor"}
+              title={demo.state.role === "Auditor" ? "Auditor access is read-only" : ""}
               onClick={() => updatePost("Cancelled")}
             >
               Cancel
             </button>
+            <button className="btn btn-outline" disabled={demo.state.role === "Auditor" || !selectedPosts.every((item) => item.status === "Scheduled")} title={demo.state.role === "Auditor" ? "Auditor access is read-only" : !selectedPosts.every((item) => item.status === "Scheduled") ? "Only scheduled posts can be confirmed as published" : "Confirm publication after provider verification"} onClick={() => updatePost("Published")}>Confirm Published</button>
             <button
               className="btn btn-outline"
               disabled={!selectedPosts.some((item) => item.status === "Failed")}
@@ -1110,6 +1211,7 @@ export function CalendarV2({
                   ? "Retry is available only for failed publishing"
                   : ""
               }
+              onClick={() => updatePost("Scheduled", selectedPosts[0]?.date, selectedPosts[0]?.time)}
             >
               Retry failed publishing
             </button>
@@ -1138,8 +1240,6 @@ export function AnalyticsV2({ go }: { go: (path: string) => void }) {
   const demo = useDemoWorkflow();
   const customers = demo.dataset.customers;
   const [filters, setFilters] = useState({
-    date: "Last 30 days",
-    comparison: "Previous 30 days",
     tier: "All tiers",
     region: "All regions",
     channel: "All channels",
@@ -1161,6 +1261,38 @@ export function AnalyticsV2({ go }: { go: (path: string) => void }) {
           filtered.length,
       )
     : 0;
+  const scheduled = demo.state.scheduledPosts.filter(
+    (post) =>
+      post.datasetId === demo.state.activeWorkspace &&
+      (filters.channel === "All channels" || post.channel === filters.channel) &&
+      (filters.campaign === "All campaigns" || post.campaignId === filters.campaign),
+  );
+  const campaignResults = demo.state.campaignResults.filter(
+    (result) =>
+      result.datasetId === demo.state.activeWorkspace &&
+      (filters.channel === "All channels" || result.channel === filters.channel) &&
+      (filters.campaign === "All campaigns" || result.campaignId === filters.campaign),
+  );
+  const filteredActions = demo.state.actions.filter(
+    (action) =>
+      action.datasetId === demo.state.activeWorkspace &&
+      (filters.action === "All actions" || action.status === filters.action),
+  );
+  const topOpportunity = demo.state.marketingOpportunities.find(
+    (item) => item.datasetId === demo.state.activeWorkspace && item.status !== "Dismissed",
+  );
+  const bestScheduledChannel = [...new Set(scheduled.map((post) => post.channel))]
+    .sort(
+      (a, b) =>
+        scheduled.filter((post) => post.channel === b).length -
+        scheduled.filter((post) => post.channel === a).length,
+    )[0];
+  const bestObservedResult = [...campaignResults]
+    .filter((result) => result.impressions > 0)
+    .sort(
+      (a, b) =>
+        b.conversions / b.impressions - a.conversions / a.impressions,
+    )[0];
   const omar = customers.find((item) => item.name === "Omar Aziz");
   const omarCalculation = omar
     ? demo.dataset.churnCalculations[omar.id]
@@ -1195,12 +1327,12 @@ export function AnalyticsV2({ go }: { go: (path: string) => void }) {
     ],
     [
       "Most important negative change",
-      "Observed data",
-      "−18% segment revenue",
-      "vs previous period",
-      "North Food & Beverage",
-      "Open MKT-003",
-      "High",
+      topOpportunity ? "Calculated operational data" : "Insufficient evidence",
+      topOpportunity ? `${topOpportunity.revenueDecline}% segment revenue run-rate decline` : "No segment currently meets configured thresholds",
+      topOpportunity ? `${topOpportunity.baselinePeriod} vs ${topOpportunity.currentPeriod}` : "Import more comparable history",
+      topOpportunity ? `${topOpportunity.region} ${topOpportunity.industry}` : "No qualifying segment",
+      topOpportunity ? `Open ${topOpportunity.id}` : "Review data coverage",
+      topOpportunity?.confidence ?? "Low",
     ],
     [
       "Largest churn driver",
@@ -1231,18 +1363,20 @@ export function AnalyticsV2({ go }: { go: (path: string) => void }) {
     ],
     [
       "Best-performing marketing channel",
-      "Observed data",
-      "Email",
-      "+8 percentage points engagement",
+      bestObservedResult ? "Observed imported campaign results" : "Scheduling workflow data",
+      bestObservedResult?.channel ?? bestScheduledChannel ?? "No channel result available",
+      bestObservedResult
+        ? `${bestObservedResult.conversions} conversions from ${bestObservedResult.impressions} impressions in ${bestObservedResult.sourceFileName}`
+        : `${scheduled.length} scheduled post records; performance events are not yet imported`,
       "Consented audience",
-      "Test approved email content",
-      "Medium",
+      bestObservedResult ? "Compare using the same attribution window before scaling" : scheduled.length ? "Import campaign results before calling a channel best-performing" : "Schedule an approved campaign",
+      bestObservedResult ? "Medium" : "Low",
     ],
     [
       "Approval bottleneck",
       "Calculated estimate",
       `${demo.state.actions.filter((item) => item.status === "Pending Approval").length} pending reviews`,
-      "median wait 1.5 days",
+      "No median wait claimed without complete event timestamps",
       "Sales queue",
       "Allocate reviewer coverage",
       "High",
@@ -1259,8 +1393,8 @@ export function AnalyticsV2({ go }: { go: (path: string) => void }) {
     [
       "Recommended management response",
       "Recommendation",
-      "Resolve approval queue and North decline",
-      "two governed workflows",
+      `Review ${filteredActions.filter((item) => item.status === "Pending Approval").length} pending actions${topOpportunity ? ` and ${topOpportunity.id}` : ""}`,
+      `${filteredActions.length} filtered actions · ${scheduled.length} filtered scheduled posts`,
       filters.region,
       "Open linked records",
       "Medium",
@@ -1287,9 +1421,12 @@ export function AnalyticsV2({ go }: { go: (path: string) => void }) {
                     <option key={item}>{item}</option>
                   ))}
                 {key === "region" &&
-                  ["North", "Central", "South"].map((item) => (
+                  ["North", "Central", "South", "East"].map((item) => (
                     <option key={item}>{item}</option>
                   ))}
+                {key === "channel" && ["LinkedIn", "Instagram", "Facebook", "Email", "WhatsApp"].map((item) => <option key={item}>{item}</option>)}
+                {key === "action" && ["Draft", "Pending Approval", "Changes Requested", "Approved and Ready", "In Progress", "Waiting for Customer", "Outcome Required", "Completed"].map((item) => <option key={item}>{item}</option>)}
+                {key === "campaign" && demo.state.campaigns.filter((item) => item.datasetId === demo.state.activeWorkspace).map((item) => <option key={item.id}>{item.id}</option>)}
               </select>
             </label>
           ))}

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   DemoAVOProvider,
   OpenAIProvider,
+  XiaomiMiMoProvider,
   getAIProvider,
   type AVOAnalysis,
 } from "@/lib/avo";
@@ -35,6 +36,8 @@ const valid: AVOAnalysis = {
 };
 afterEach(() => {
   delete process.env.OPENAI_API_KEY;
+  delete process.env.XIAOMIMIMO_API_KEY;
+  delete process.env.XIAOMIMIMO_OPENAI_TOKEN_PLAN;
 });
 describe("AVO providers", () => {
   it("uses and labels the deterministic demo fallback", async () => {
@@ -97,5 +100,11 @@ describe("AVO providers", () => {
     expect(getAIProvider()).toBeInstanceOf(DemoAVOProvider);
     process.env.OPENAI_API_KEY = "test-only-not-a-real-key";
     expect(getAIProvider()).toBeInstanceOf(OpenAIProvider);
+  });
+  it("selects regular Xiaomi MiMo API credentials but never consumes a Token Plan key", () => {
+    process.env.XIAOMIMIMO_OPENAI_TOKEN_PLAN = "tp-not-valid-for-app-backends";
+    expect(getAIProvider()).toBeInstanceOf(DemoAVOProvider);
+    process.env.XIAOMIMIMO_API_KEY = "test-only-regular-api-key";
+    expect(getAIProvider()).toBeInstanceOf(XiaomiMiMoProvider);
   });
 });

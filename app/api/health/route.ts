@@ -4,7 +4,11 @@ export function GET() {
     status: "ok",
     service: "customerpulse-ai",
     release: "workflow-v2",
-    avoProvider: process.env.OPENAI_API_KEY ? "openai" : "demo",
+    avoProvider: process.env.XIAOMIMIMO_API_KEY
+      ? "xiaomi-mimo-configured"
+      : process.env.OPENAI_API_KEY
+        ? "openai"
+        : "demo",
     publisher: process.env.BUFFER_API_KEY ? "buffer" : "demo",
     timestamp: new Date().toISOString(),
   });
