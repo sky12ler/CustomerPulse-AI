@@ -201,7 +201,16 @@ export class OpenAIProvider implements AIProvider {
     }
     if (!response.output_text)
       throw new Error("AVO live provider returned no structured output");
-    const parsed = analysisSchema.parse(JSON.parse(response.output_text));
+    const providerAnalysis = analysisSchema.parse(JSON.parse(response.output_text));
+    const parsed = /^(none|n\/?a|no uncertainty)[.! ]*$/i.test(
+      providerAnalysis.uncertainty_reason.trim(),
+    )
+      ? {
+          ...providerAnalysis,
+          uncertainty_reason:
+            "Intent and future behaviour remain inferences; staff verification is required.",
+        }
+      : providerAnalysis;
     if (
       !validateEvidence(
         c.messages.map((m) => m.id),

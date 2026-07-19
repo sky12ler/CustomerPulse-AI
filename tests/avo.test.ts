@@ -138,10 +138,13 @@ describe("AVO providers", () => {
     let request: unknown;
     const provider = new XiaomiMiMoProvider(async (value) => {
       request = value;
-      return { output_text: JSON.stringify(valid) };
+      return {
+        output_text: JSON.stringify({ ...valid, uncertainty_reason: "None" }),
+      };
     });
     const out = await provider.analyze(customers[0]);
     expect(out.demo).toBe(false);
+    expect(out.analysis.uncertainty_reason).toContain("remain inferences");
     expect(JSON.stringify(request)).toContain('"type":"json_object"');
     expect(JSON.stringify(request)).toContain("analysis_confidence");
   });
