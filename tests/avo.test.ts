@@ -134,6 +134,17 @@ describe("AVO providers", () => {
       "invalid evidence",
     );
   });
+  it("uses Xiaomi MiMo's supported json_object response format", async () => {
+    let request: unknown;
+    const provider = new XiaomiMiMoProvider(async (value) => {
+      request = value;
+      return { output_text: JSON.stringify(valid) };
+    });
+    const out = await provider.analyze(customers[0]);
+    expect(out.demo).toBe(false);
+    expect(JSON.stringify(request)).toContain('"type":"json_object"');
+    expect(JSON.stringify(request)).toContain("analysis_confidence");
+  });
   it("selects demo without a key and live with a key", () => {
     expect(getAIProvider()).toBeInstanceOf(DemoAVOProvider);
     process.env.OPENAI_API_KEY = "test-only-not-a-real-key";

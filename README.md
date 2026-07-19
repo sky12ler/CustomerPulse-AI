@@ -87,7 +87,7 @@ npm run build
 npm audit --audit-level=low
 ```
 
-The current automated baseline is 16 Vitest files / 124 tests and 45 Playwright workflows. The AVO chat accepts ordinary operational questions and grounds answers in the active role-scoped workspace; every reply names the live provider or deterministic fallback actually used. See `docs/TESTING.md` for the last completed run and the distinction between local, provider and deployed-production verification.
+The current automated baseline is 16 Vitest files / 125 tests and 45 Playwright workflows. The AVO chat accepts ordinary operational questions and grounds answers in the active role-scoped workspace; every reply names the live provider or deterministic fallback actually used. See `docs/TESTING.md` for the last completed run and the distinction between local, provider and deployed-production verification.
 
 ## Deployment
 

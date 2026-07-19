@@ -30,7 +30,7 @@ Verification date: 19 July 2026. “Verified” below means covered by an observ
 
 - ESLint: passed.
 - TypeScript: passed.
-- Vitest: 16 files, 124/124 passed.
+- Vitest: 16 files, 125/125 passed.
 - Production build: passed.
 - Playwright: 45/45 passed against the optimized local production server.
 - MiMo: production OpenAI-compatible requests succeeded with `mimo-v2.5-pro`; browser Scenario B also completed the AVO route during regression.
