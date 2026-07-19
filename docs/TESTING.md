@@ -27,7 +27,7 @@ npm audit --audit-level=low
 | MiMo endpoint | Connected; `mimo-v2.5-pro` returned model output |
 | npm audit | 0 vulnerabilities at `--audit-level=low` |
 | Secret scan | Passed; `.env.local` ignored/untracked, no credential/private-key match (one known synthetic env assignment in an AVO unit test) |
-| Vercel production Playwright | 45/45 passed against the public URL in 2.1 minutes |
+| Vercel production Playwright | 45/45 passed against the public URL in 2.0 minutes |
 | Production MiMo requests | Chat and structured analysis passed; `mimo-v2.5-pro` returned `Xiaomi MiMo live provider`, `demo: false`, valid evidence IDs and enforced uncertainty |
 
 This table is intentionally conservative and is updated only after each command completes.
