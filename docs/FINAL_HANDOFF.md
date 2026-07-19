@@ -5,14 +5,14 @@ Verification date: 19 July 2026 (Asia/Kuala Lumpur).
 ## Production release
 
 - Production URL: https://customer-pulse-ai-eight.vercel.app
-- Application commit: `675e291533482975a9404fbc785f318c98ba2002`
-- Vercel deployment: `dpl_D32DHhrZDdxeHEJDnnmP6azqgxru`
+- Application commit: `5a22d05b759808f4fa97727c85de472257d84c30`
+- Vercel deployment: `dpl_4fAFL7gYHYVNC2Kt1XejBaLucY3K`
 - Deployment state: Ready; the production alias was confirmed on the deployment.
 - Health check: `status: ok`, `release: workflow-v2`, `avoProvider: demo`, `publisher: demo`.
 
 ## Production acceptance results
 
-All results below were exercised through the deployed UI at the production URL. The final complete production Playwright run passed 30/30 tests in Chromium, including the four explicit A-D workflow tests.
+The latest Phase 2 deployment was exercised directly at the production URL: 13/13 customer-workspace Playwright tests passed in Chromium. The A-D results below were also verified in the earlier production acceptance release and all 44 combined tests passed locally against the current optimized production build; the full 44-test suite was not rerun publicly for this Phase 2 deployment.
 
 - A — Data import: passed. Administrator persisted across routes. `customers.csv`, `conversations.csv`, and `product-catalogue.pdf` each completed upload, preview/validation, confirmation, success summary, shared Import History, and audit verification. The PDF uses explicit Node canvas primitives and the parser's embedded worker in Vercel.
 - B — Customer retention: passed. Maya Tan's conversation and AVO analysis showed source evidence, 92% confidence, and labelled uncertainty. Her churn alert led to a recommendation, Pending Approval action, different-role Sales Manager approval with comment, Account Executive WhatsApp demo execution, recorded outcome, and the complete audited transition chain.
@@ -32,9 +32,9 @@ All results below were exercised through the deployed UI at the production URL. 
 
 - ESLint: passed with zero errors.
 - TypeScript: passed with `tsc --noEmit`.
-- Unit tests: 47/47 passed across 8 Vitest files, including all permanent mock imports and document parsing.
-- Local Playwright: 30/30 passed against an optimized production server.
-- Production Playwright: 30/30 passed against the public Vercel URL; the explicit A-D subset passed 4/4 separately after deployment.
+- Unit tests: 109/109 passed across 12 Vitest files, including all permanent mock imports, ERAR-v1, assignment scoping, RLS structure, and document parsing.
+- Local Playwright: 44/44 passed against the current optimized production server.
+- Production Playwright: 13/13 Phase 2 customer tests passed against the current public Vercel deployment; the earlier release recorded 30/30 general production tests and 4/4 explicit A-D tests.
 - Production build: passed locally and in Vercel.
 - `npm audit --audit-level=low`: zero vulnerabilities.
 - Secret scan: no real credential or private-key match. `tests/avo.test.ts` contains only the explicit fixture `test-only-not-a-real-key`.
@@ -127,4 +127,4 @@ Phase 2 adds customer-specific URLs, semantic and keyboard-accessible navigation
 
 Demo assignment policy: Account Executive -> Aisha Rahman. That scope is enforced in the shared provider, lookups, conversations, alerts, recommendations, actions, AVO requests, exports, and relevant audit views. Administrator and Sales Manager have wider authorized demo scope; Auditor remains read-only. Supabase migration `202607190002_customer_assignment_rls.sql` adds assignment-aware RLS and ERAR-v1 fields, but Supabase runtime persistence is still not connected or live-tested.
 
-Phase 2 local gates on 19 July 2026: ESLint passed; TypeScript passed; 109/109 unit tests passed; 44/44 Playwright tests passed; optimized production build passed; npm audit found zero vulnerabilities; secret scan found no real key or private key. These local results do not claim that the Phase 2 commit is deployed. The production URL, deployment ID, commit SHA, and public-browser result below must be updated only after the new Vercel deployment is observed.
+Phase 2 local gates on 19 July 2026: ESLint passed; TypeScript passed; 109/109 unit tests passed; 44/44 Playwright tests passed; optimized production build passed; npm audit found zero vulnerabilities; secret scan found no real key or private key. Production deployment verified: commit `5a22d05b759808f4fa97727c85de472257d84c30`, deployment `dpl_4fAFL7gYHYVNC2Kt1XejBaLucY3K`, Ready and aliased to `https://customer-pulse-ai-eight.vercel.app`. The public Phase 2 suite passed 13/13 in 25.6 seconds; `/api/health` returned `status: ok`, `avoProvider: demo`, and `publisher: demo`.

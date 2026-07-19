@@ -67,3 +67,7 @@ The 13 Phase 2 Playwright cases cover the requested 40 behaviors through grouped
 Unit additions verify demo assignment and lookup semantics, action scoping, Auditor AVO denial, all seeded ERAR-v1 identities including Maya, formula clamping, reasoned override audit output, default ordering, compatible filters, sort directions, and static Supabase assignment-policy structure.
 
 These results are local production-mode evidence. Public Vercel verification must set `PLAYWRIGHT_BASE_URL=https://customer-pulse-ai-eight.vercel.app` and rerun the relevant suite after deployment; document failures rather than treating local success as production success.
+
+### Phase 2 public production result
+
+Deployment `dpl_4fAFL7gYHYVNC2Kt1XejBaLucY3K`, source commit `5a22d05b759808f4fa97727c85de472257d84c30`: 13/13 Phase 2 Playwright tests passed directly against `https://customer-pulse-ai-eight.vercel.app` in 25.6 seconds. Health returned `status: ok`, `avoProvider: demo`, and `publisher: demo`. This production run covers Customer navigation/deep links, tabs/refresh, filters/sorts/state restoration, pagination, ERAR details, Account Executive URL/API/export denial, manager/admin scope, Auditor read-only behavior, Overview navigation, and mobile overflow. The full current 44-test suite passed locally; only the 13-test Phase 2 file was rerun on this deployment.
