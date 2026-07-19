@@ -5,8 +5,8 @@ Verification date: 20 July 2026 (Asia/Kuala Lumpur).
 ## Release reference
 
 - Production URL: https://customer-pulse-ai-eight.vercel.app
-- Deployed application commit: `a58d3c1`
-- Vercel deployment: `dpl_2GUKG8RowBxUB5zQvPZhXjEoQ2Fk` (`READY`, production)
+- Deployed application commit: `127d27d`
+- Vercel deployment: `dpl_H8PSSBnyaNon3TMh6sbfxWbA4dH1` (`READY`, production)
 - Production MiMo connection: verified against the configured OpenAI-compatible endpoint with model `mimo-v2.5-pro`
 - Imported Workspace mode: browser-local by product decision; no login or shared anonymous Supabase access
 
@@ -55,8 +55,8 @@ Verification date: 20 July 2026 (Asia/Kuala Lumpur).
 | Xiaomi MiMo endpoint | Connected; `mimo-v2.5-pro` returned output |
 | npm audit | 0 vulnerabilities at `--audit-level=low` |
 | Secret scan | Passed; `.env.local` ignored/untracked and no real credential/private-key match |
-| Vercel production regression | 45/45 passed against the public production URL in 1.4 minutes |
-| Production MiMo AVO | Live request passed: `Xiaomi MiMo live provider`, `demo: false`, model `mimo-v2.5-pro`, no fallback reason |
+| Vercel production regression | 45/45 passed against the public production URL in 2.1 minutes |
+| Production MiMo AVO | Live chat and structured analysis passed: `Xiaomi MiMo live provider`, `demo: false`, model `mimo-v2.5-pro`, valid evidence IDs and enforced uncertainty |
 
 ## Required environment variables
 
@@ -86,7 +86,7 @@ No database or Auth account is required for the selected hackathon workflow. Mig
 
 1. Push the final commit to GitHub.
 2. Confirm all environment variables exist for Production in Vercel.
-3. Redeploy after future application changes. Deployment `dpl_2GUKG8RowBxUB5zQvPZhXjEoQ2Fk` currently serves the verified release.
+3. Redeploy after future application changes. Deployment `dpl_H8PSSBnyaNon3TMh6sbfxWbA4dH1` currently serves the verified release.
 4. Check `/api/health`; “configured” means credentials exist, while a completed AVO response proves live use.
 5. Select Imported Workspace, import the connected scenario pack and refresh in the same browser.
 6. Run the 45-test Playwright regression against the production URL and record any environment-only failures honestly.
