@@ -24,11 +24,11 @@ npm audit --audit-level=low
 | Vitest | 16 files, 124/124 passed |
 | Local production build | Passed |
 | Local Playwright | 45/45 passed against the optimized production server in 43.7 seconds |
-| MiMo endpoint | Connected; `mimo-v2.5` returned model output |
+| MiMo endpoint | Connected; `mimo-v2.5-pro` returned model output |
 | npm audit | 0 vulnerabilities at `--audit-level=low` |
 | Secret scan | Passed; `.env.local` ignored/untracked, no credential/private-key match (one known synthetic env assignment in an AVO unit test) |
 | Vercel production Playwright | 45/45 passed against the public URL in 1.4 minutes |
-| Production MiMo request | Xiaomi attempted, then explicit Demo fallback; provider returned `401 Invalid API Key` |
+| Production MiMo request | Passed; `mimo-v2.5-pro` returned `Xiaomi MiMo live provider`, `demo: false`, with no fallback reason |
 
 This table is intentionally conservative and is updated only after each command completes.
 

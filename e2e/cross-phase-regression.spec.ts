@@ -80,9 +80,10 @@ test("Cross-phase imported operational pipeline changes customer state and audit
     page.getByText(/Iris Demo.*CUS-1015|CUS-1015.*Iris Demo/i),
   ).toBeVisible();
   await expect(
-    page.getByText(/Xiaomi MiMo live provider|AVO Operational Fallback/, {
-      exact: true,
-    }),
+    page
+      .locator(".message strong")
+      .filter({ hasText: /Xiaomi MiMo live provider|AVO Operational Fallback/ })
+      .last(),
   ).toBeVisible();
   await page.getByRole("link", { name: "Conversations", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Maya Tan" })).toBeVisible();

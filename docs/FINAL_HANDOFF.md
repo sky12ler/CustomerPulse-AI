@@ -5,9 +5,9 @@ Verification date: 20 July 2026 (Asia/Kuala Lumpur).
 ## Release reference
 
 - Production URL: https://customer-pulse-ai-eight.vercel.app
-- Application commit: `6d3cee5de4d7e0a31872dd5f050b7ca976443960`
-- Vercel deployment: `dpl_D4ieQXtvfYqQ4g8bLfLMeQkgJ2ri` (`READY`, production)
-- Local MiMo connection: verified against the configured OpenAI-compatible endpoint with model `mimo-v2.5`
+- Deployed application commit: `a58d3c1`
+- Vercel deployment: `dpl_2GUKG8RowBxUB5zQvPZhXjEoQ2Fk` (`READY`, production)
+- Production MiMo connection: verified against the configured OpenAI-compatible endpoint with model `mimo-v2.5-pro`
 - Imported Workspace mode: browser-local by product decision; no login or shared anonymous Supabase access
 
 ## Problems found during the user walkthrough and resolution
@@ -52,11 +52,11 @@ Verification date: 20 July 2026 (Asia/Kuala Lumpur).
 | Vitest | 16 files, 124/124 passed |
 | Local production build | Passed as part of Playwright runner |
 | Local Playwright | 45/45 passed against an optimized production server in 43.7 seconds |
-| Xiaomi MiMo endpoint | Connected; `mimo-v2.5` returned output |
+| Xiaomi MiMo endpoint | Connected; `mimo-v2.5-pro` returned output |
 | npm audit | 0 vulnerabilities at `--audit-level=low` |
 | Secret scan | Passed; `.env.local` ignored/untracked and no real credential/private-key match |
 | Vercel production regression | 45/45 passed against the public production URL in 1.4 minutes |
-| Production MiMo AVO | Explicit Demo fallback observed: Xiaomi attempt returned `401 Invalid API Key`; Vercel credentials/base URL need manual update |
+| Production MiMo AVO | Live request passed: `Xiaomi MiMo live provider`, `demo: false`, model `mimo-v2.5-pro`, no fallback reason |
 
 ## Required environment variables
 
@@ -86,7 +86,7 @@ No database or Auth account is required for the selected hackathon workflow. Mig
 
 1. Push the final commit to GitHub.
 2. Confirm all environment variables exist for Production in Vercel.
-3. Redeploy the production branch. Deployment `dpl_D4ieQXtvfYqQ4g8bLfLMeQkgJ2ri` currently serves the release.
+3. Redeploy after future application changes. Deployment `dpl_2GUKG8RowBxUB5zQvPZhXjEoQ2Fk` currently serves the verified release.
 4. Check `/api/health`; “configured” means credentials exist, while a completed AVO response proves live use.
 5. Select Imported Workspace, import the connected scenario pack and refresh in the same browser.
 6. Run the 45-test Playwright regression against the production URL and record any environment-only failures honestly.
