@@ -50,7 +50,7 @@ GPT-5.6 powered the Codex development work in this session. The application runt
 - Implemented a full retention feedback loop in which recorded outcomes run the real risk engine.
 - Added a complete upload-driven Imported Workspace pipeline with operational audit history and no login dependency.
 - Built connected mixed-risk upload cases covering risk, growth, privacy, abstention, stability and recovery.
-- Reached a verified local baseline of 123 unit tests; final browser/security/production counts are copied from `docs/TESTING.md` only after completion.
+- Reached a verified local baseline of 124 unit tests; final browser/security/production counts are copied from `docs/TESTING.md` only after completion.
 
 ## 10. What we learned
 

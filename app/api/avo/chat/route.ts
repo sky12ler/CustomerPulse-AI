@@ -4,6 +4,7 @@ import {
   deterministicChatAnswer,
   type AvoChatContext,
 } from "@/lib/avo-chat";
+import { getMiMoConfig } from "@/lib/mimo-config";
 
 export async function POST(req: NextRequest) {
   const body = (await req.json()) as {
@@ -24,17 +25,16 @@ export async function POST(req: NextRequest) {
       provider: "AVO Operational Fallback",
       demo: true,
     });
-  const apiKey = process.env.XIAOMIMIMO_API_KEY;
-  if (!apiKey) return fallback();
+  const config = getMiMoConfig();
+  if (!config.apiKey) return fallback();
 
   try {
     const client = new OpenAI({
-      apiKey,
-      baseURL:
-        process.env.XIAOMIMIMO_BASE_URL ?? "https://api.xiaomimimo.com/v1",
+      apiKey: config.apiKey,
+      baseURL: config.baseURL,
     });
     const response = await client.responses.create({
-      model: process.env.XIAOMIMIMO_MODEL ?? "mimo-v2.5",
+      model: config.model,
       instructions:
         "You are AVO, a friendly operational customer assistant. Converse naturally. For operational claims, use only the supplied authorised workspace context, cite customer or record IDs, distinguish observed records from inference, and state uncertainty when relevant. Never approve, execute, invent records, or claim certain future churn. Keep answers concise.",
       input: JSON.stringify({

@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { ResponseCreateParamsNonStreaming } from "openai/resources/responses/responses";
 import type { Customer } from "./types";
 import { detectPromptInjection, validateEvidence } from "./engines";
+import { getMiMoConfig } from "./mimo-config";
 
 export const analysisSchema = z.object({
   concise_summary: z.string(),
@@ -203,18 +204,18 @@ export class OpenAIProvider implements AIProvider {
 
 export class XiaomiMiMoProvider extends OpenAIProvider {
   constructor(transport?: ResponseTransport) {
+    const config = getMiMoConfig();
     super(transport, {
       name: "Xiaomi MiMo live provider",
-      apiKey: process.env.XIAOMIMIMO_API_KEY,
-      baseURL:
-        process.env.XIAOMIMIMO_BASE_URL ?? "https://api.xiaomimimo.com/v1",
-      model: process.env.XIAOMIMIMO_MODEL ?? "mimo-v2.5",
+      apiKey: config.apiKey,
+      baseURL: config.baseURL,
+      model: config.model,
     });
   }
 }
 
 export function getAIProvider(): AIProvider {
-  if (process.env.XIAOMIMIMO_API_KEY) return new XiaomiMiMoProvider();
+  if (getMiMoConfig().apiKey) return new XiaomiMiMoProvider();
   if (process.env.OPENAI_API_KEY) return new OpenAIProvider();
   return new DemoAVOProvider();
 }

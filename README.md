@@ -55,9 +55,9 @@ Open `http://localhost:3000`. Demo Workspace works without credentials.
 For live AVO in either workspace, configure:
 
 ```text
-XIAOMIMIMO_API_KEY=
-XIAOMIMIMO_BASE_URL=
-XIAOMIMIMO_MODEL=mimo-v2.5
+MIMO_API_KEY=
+MIMO_BASE_URL=https://api.xiaomimimo.com/v1
+MIMO_MODEL=mimo-v2.5-pro
 ```
 
 MiMo credentials are server-only. Never prefix them with `NEXT_PUBLIC_`. A key that is not accepted by the OpenAI-compatible endpoint falls back visibly to Demo AVO.
@@ -87,7 +87,7 @@ npm run build
 npm audit --audit-level=low
 ```
 
-The current automated baseline is 16 Vitest files / 123 tests and 45 Playwright workflows. The AVO chat accepts ordinary operational questions and grounds answers in the active role-scoped workspace; every reply names the live provider or deterministic fallback actually used. See `docs/TESTING.md` for the last completed run and the distinction between local, provider and deployed-production verification.
+The current automated baseline is 16 Vitest files / 124 tests and 45 Playwright workflows. The AVO chat accepts ordinary operational questions and grounds answers in the active role-scoped workspace; every reply names the live provider or deterministic fallback actually used. See `docs/TESTING.md` for the last completed run and the distinction between local, provider and deployed-production verification.
 
 ## Deployment
 

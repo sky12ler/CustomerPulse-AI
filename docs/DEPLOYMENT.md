@@ -9,9 +9,9 @@ No database or login setup is required. Imported Workspace is intentionally brow
 Required for live MiMo AVO:
 
 ```text
-XIAOMIMIMO_API_KEY
-XIAOMIMIMO_BASE_URL
-XIAOMIMIMO_MODEL=mimo-v2.5
+MIMO_API_KEY
+MIMO_BASE_URL=https://api.xiaomimimo.com/v1
+MIMO_MODEL=mimo-v2.5-pro
 ```
 
 Optional:

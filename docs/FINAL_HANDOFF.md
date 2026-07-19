@@ -49,7 +49,7 @@ Verification date: 20 July 2026 (Asia/Kuala Lumpur).
 | --- | --- |
 | ESLint | Passed |
 | TypeScript | Passed |
-| Vitest | 16 files, 123/123 passed |
+| Vitest | 16 files, 124/124 passed |
 | Local production build | Passed as part of Playwright runner |
 | Local Playwright | 45/45 passed against an optimized production server in 43.7 seconds |
 | Xiaomi MiMo endpoint | Connected; `mimo-v2.5` returned output |
@@ -63,9 +63,9 @@ Verification date: 20 July 2026 (Asia/Kuala Lumpur).
 Live MiMo AVO:
 
 ```text
-XIAOMIMIMO_API_KEY=
-XIAOMIMIMO_BASE_URL=
-XIAOMIMIMO_MODEL=mimo-v2.5
+MIMO_API_KEY=
+MIMO_BASE_URL=https://api.xiaomimimo.com/v1
+MIMO_MODEL=mimo-v2.5-pro
 ```
 
 Optional publishing:

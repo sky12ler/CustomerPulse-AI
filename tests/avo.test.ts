@@ -36,10 +36,18 @@ const valid: AVOAnalysis = {
 };
 afterEach(() => {
   delete process.env.OPENAI_API_KEY;
+  delete process.env.MIMO_API_KEY;
+  delete process.env.MIMO_BASE_URL;
+  delete process.env.MIMO_MODEL;
   delete process.env.XIAOMIMIMO_API_KEY;
   delete process.env.XIAOMIMIMO_OPENAI_TOKEN_PLAN;
 });
 describe("AVO providers", () => {
+  it("accepts the concise MiMo environment variable names", () => {
+    process.env.MIMO_API_KEY = "test-only-regular-api-key";
+    process.env.MIMO_MODEL = "mimo-v2.5-pro";
+    expect(getAIProvider()).toBeInstanceOf(XiaomiMiMoProvider);
+  });
   it("uses and labels the deterministic demo fallback", async () => {
     const out = await new DemoAVOProvider().analyze(customers[0]);
     expect(out.demo).toBe(true);
