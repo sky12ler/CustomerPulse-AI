@@ -73,6 +73,11 @@ describe("permanent mock imports", () => {
     expect(transactionRows.every((row) => ids.has(row.customer_external_id))).toBe(true);
     expect(conversationRows.every((row) => ids.has(row.customer_external_id))).toBe(true);
     expect(customerRows.some((row) => row.consent_status === "withdrawn")).toBe(true);
-    expect(customerRows.some((row) => !row.email && !row.phone)).toBe(true);
+    expect(
+      customerRows.some(
+        (row) =>
+          row.preferred_channel === "WhatsApp" && row.email && !row.phone,
+      ),
+    ).toBe(true);
   });
 });
