@@ -5,44 +5,69 @@ Verification date: 19 July 2026 (Asia/Kuala Lumpur).
 ## Production release
 
 - Production URL: https://customer-pulse-ai-eight.vercel.app
-- Application commit: `5a22d05b759808f4fa97727c85de472257d84c30`
-- Vercel deployment: `dpl_4fAFL7gYHYVNC2Kt1XejBaLucY3K`
-- Deployment state: Ready; the production alias was confirmed on the deployment.
-- Health check: `status: ok`, `release: workflow-v2`, `avoProvider: demo`, `publisher: demo`.
+- Application commit: `0e7225d4b1208c3196a991bc48184969f96b6b32`
+- Vercel deployment: `dpl_Bz4gAtdCwcV4H497JCwBDq6vDWmK`
+- Deployment state: `READY`, target `production`, aliased to the production URL.
+- Health: `status: ok`, `release: workflow-v2`, `avoProvider: demo`, `publisher: demo`.
 
-## Production acceptance results
+The complete 45-test Chromium regression passed directly against this production deployment in 1.4 minutes. This was a public-host run, not an inference from local tests.
 
-The latest Phase 2 deployment was exercised directly at the production URL: 13/13 customer-workspace Playwright tests passed in Chromium. The A-D results below were also verified in the earlier production acceptance release and all 44 combined tests passed locally against the current optimized production build; the full 44-test suite was not rerun publicly for this Phase 2 deployment.
+## Cross-phase production acceptance
 
-- A — Data import: passed. Administrator persisted across routes. `customers.csv`, `conversations.csv`, and `product-catalogue.pdf` each completed upload, preview/validation, confirmation, success summary, shared Import History, and audit verification. The PDF uses explicit Node canvas primitives and the parser's embedded worker in Vercel.
-- B — Customer retention: passed. Maya Tan's conversation and AVO analysis showed source evidence, 92% confidence, and labelled uncertainty. Her churn alert led to a recommendation, Pending Approval action, different-role Sales Manager approval with comment, Account Executive WhatsApp demo execution, recorded outcome, and the complete audited transition chain.
-- C — Marketing: passed. The segment-decline trigger prefilled the brief and audience. All seven Campaign Studio stages completed; a different authorized user approved the campaign; Demo Publisher scheduled it; the campaign was highlighted in the shared calendar; approval/scheduling audit events and Marketing Intelligence/Analytics insights were verified.
-- D — UX: passed. Role persistence, Back/Continue/Next Step navigation, disabled-button explanations, direct next-action links, mobile navigation/layout, and Guided Demo Scenarios A and C were exercised.
+| # | Required behavior | Verified production evidence | Result |
+| --- | --- | --- | --- |
+| 1 | Imports update the operational store | Confirmed customer, transaction and conversation imports changed the Imported Workspace; imported customer, TXN-000 and MSG-A-104 were read back from Customer 360 | Passed |
+| 2 | AVO creates validated signals | Imported Maya analysis persisted evidence-linked `AVO Analysis` signals and a stored analysis with confidence and uncertainty | Passed in Demo AVO mode |
+| 3 | Churn recalculates dynamically | Imports and AVO invoke the authoritative engine and audit score before/after; Omar's recorded outcome changed the actual stored score | Passed |
+| 4 | Alerts create, update and resolve dynamically | Unit cases exercise create/update/resolve/reopen/idempotency; production Maya and Omar workflows exercise alert updates and recovery resolution | Passed |
+| 5 | Changes Requested supports revision/resubmission | Maya moved Pending Approval -> Changes Requested -> Draft Revision -> Pending Approval with versioned content and reviewer feedback | Passed |
+| 6 | Lifecycle transitions are separate | Start, execution confirmation, customer response and outcome each changed a separate state and record | Passed |
+| 7 | Outcome triggers real risk recalculation | Omar's Purchase completed outcome changed customer score, risk, monitored state, summary metrics and audit values | Passed |
+| 8 | Customer links open `/customers/[customerId]` | Name, View Customer, row mouse and keyboard navigation were exercised | Passed |
+| 9 | Refresh preserves Customer 360 | Deep route, active tab and list-return state survived refresh | Passed |
+| 10 | Account Executive sees assigned customers only | Aisha Rahman's list, direct URL, API, action, export and audit scope were exercised; an unassigned customer was denied | Passed |
+| 11 | Filters/sorts/pagination use operational data | All controls changed live scoped results, counts, URL state and pagination | Passed |
+| 12 | Revenue at risk is authoritative | ERAR-v1 uses next-90-day eligible revenue x normalized churn probability; list and Customer 360 agree | Passed |
+| 13 | Customer metrics update after recalculation | Omar's recovery changed at least one risk/revenue summary and Reset restored the original values | Passed |
+| 14 | Analytics updates after actions/outcomes | Analytics changed from Recovery monitoring to Successful recovery and displayed the recorded outcome and current calculated risk | Passed |
+| 15 | Exports respect filters/RBAC | Export followed the current scoped, filtered and sorted result set and excluded inaccessible customers | Passed |
+| 16 | Demo Reset restores original data | Omar's action, customer summaries and analytics returned to seeded state; Imported Workspace remains separate | Passed |
+| 17 | Scenarios A and D complete | Scenario A's governed Maya chain and Scenario D's observed Omar recovery completed end to end | Passed |
+| 18 | Desktop/mobile workflows | Desktop table workflows, mobile cards/navigation and no-horizontal-overflow checks passed | Passed |
+| 19 | Audit contains before/after values | Lifecycle events now record named state before/after; AVO/outcome events record score before/after | Passed |
+
+A recalculation is not claimed to change a rounded score in every case: a valid low-weight signal may produce the same displayed integer. The implementation still stores the signal, runs the engine and audits the actual before/after values.
 
 ## Completed functionality
 
-- Shared persisted demo state for role, imports, recommendations, retention actions, approvals, execution/outcomes, campaigns, scheduled posts, audit events, and guided-demo progress.
-- Four-stage imports with templates/examples, mapping, preview, structured validation, error export, PDF/DOCX/XLSX support, confirmation, success links, history, and audits.
-- Evidence-grounded Demo AVO analysis with confidence and explicit uncertainty, plus optional OpenAI adapter.
-- Enforced requester/reviewer/executor separation, self-approval blocking, reviewer comments, consent checks, and immutable-style audit events.
-- Seven-stage Campaign Studio with persisted draft/version state, review checklist, approval gate, Demo Publisher scheduling, shared calendar records, filters, highlighting, and audit history.
-- Marketing Intelligence, Analytics, role-aware navigation, responsive layouts, and guided Scenarios A-D.
+- Isolated Demo and Imported operational workspaces persisted in browser localStorage.
+- Incremental customer, transaction, conversation, product and document imports with provenance, validation, confirmation, recalculation and audit.
+- Deterministic tier, hybrid churn and ERAR-v1 calculations; evidence-linked AVO analyses become validated or review-required signals rather than writing scores directly.
+- Dynamic alert create/update/resolve/reopen behavior.
+- Governed recommendation lifecycle with Changes Requested, versioned revision, resubmission, different-user approval and separate start/execution/response/outcome transitions.
+- Customer 360 deep links, refresh-safe tabs, operational filters, sorting, pagination, summaries, scoped export and responsive mobile cards.
+- Dynamic customer metrics, retention analytics and audit history based on current operational records.
+- Seven-step campaign workflow, consent and approval gates, Demo Publisher scheduling and calendar highlighting.
+- Demo Reset restores seeded Demo Workspace data without silently mixing it with Imported Workspace records.
 
-## Verification gates
+## Quality and security results
 
-- ESLint: passed with zero errors.
-- TypeScript: passed with `tsc --noEmit`.
-- Unit tests: 109/109 passed across 12 Vitest files, including all permanent mock imports, ERAR-v1, assignment scoping, RLS structure, and document parsing.
-- Local Playwright: 44/44 passed against the current optimized production server.
-- Production Playwright: 13/13 Phase 2 customer tests passed against the current public Vercel deployment; the earlier release recorded 30/30 general production tests and 4/4 explicit A-D tests.
-- Production build: passed locally and in Vercel.
-- `npm audit --audit-level=low`: zero vulnerabilities.
-- Secret scan: no real credential or private-key match. `tests/avo.test.ts` contains only the explicit fixture `test-only-not-a-real-key`.
-- Git status: local `.env.local` and `.vercel/` are ignored. The Vercel OIDC token created during CLI linking was not committed.
+| Gate | Result |
+| --- | --- |
+| ESLint | Passed, zero errors |
+| TypeScript | Passed with `tsc --noEmit` |
+| Vitest | 12 files, 109/109 tests passed |
+| Local Playwright | 45/45 passed against an optimized production server |
+| Production Playwright | 45/45 passed against the public Vercel URL in 1.4 minutes |
+| Production build | Passed locally and on Vercel |
+| npm audit | 0 vulnerabilities at `--audit-level=low` |
+| Secret scan | 0 credential-like or private-key matches outside ignored environment/dependency/build paths |
+
+All permanent mock-data formats are covered by unit parsing tests. Production browser tests explicitly upload `customers.csv`, `transactions.csv`, `conversations.csv`, and `product-catalogue.pdf`.
 
 ## Environment variables
 
-No environment variable is required for the verified no-credential demo. Optional server-side variables are:
+No variable is required for the verified credential-free demo. Optional server-side configuration is:
 
 ```text
 OPENAI_API_KEY=
@@ -55,76 +80,45 @@ SUPABASE_SERVICE_ROLE_KEY=
 NEXT_PUBLIC_APP_URL=
 ```
 
-With no OpenAI or Buffer credentials, the app visibly uses deterministic Demo AVO and Demo Publisher. Never place service-role, OpenAI, Buffer, or Vercel tokens in `NEXT_PUBLIC_*` variables.
+Without OpenAI or Buffer credentials the UI visibly uses deterministic Demo AVO and Demo Publisher. Never expose OpenAI, Buffer, service-role or Vercel tokens through `NEXT_PUBLIC_*`.
 
-## Database deployment steps
+## Database deployment
 
-The verified demo uses browser `localStorage`; the Supabase schema is supplied but is not connected to the UI runtime.
+The verified production UI uses browser localStorage. The supplied Supabase schema is not connected to the runtime UI.
 
-1. Create a Supabase project and install/authenticate the Supabase CLI.
+1. Create a Supabase project and authenticate the Supabase CLI.
 2. Run `supabase link --project-ref <project-ref>`.
-3. Apply `supabase/migrations/202607180001_initial_schema.sql` with `supabase db push`.
-4. Set Supabase secrets in local/Vercel secret storage; keep `SUPABASE_SERVICE_ROLE_KEY` server-only.
-5. For disposable local data, run `supabase db reset` to apply the migration and `supabase/seed.sql`.
-6. For an explicitly configured project only, run `node scripts/reset-demo.mjs --confirm`.
-7. Create private import/document/asset buckets, use signed URLs, and run live two-organization RLS tests before using real customer data.
-8. Connecting the current UI store to Supabase requires additional implementation and verification.
+3. Run `supabase db push` to apply both migrations, including assignment-aware RLS and ERAR-v1 fields.
+4. Put Supabase values in local/Vercel secret storage; keep `SUPABASE_SERVICE_ROLE_KEY` server-only.
+5. For disposable local data, run `supabase db reset` to apply migrations and `supabase/seed.sql`.
+6. Only for an explicitly configured project, use `node scripts/reset-demo.mjs --confirm`.
+7. Before real customer data, implement the UI database adapter and verify Auth, Storage, two-organization RLS, backup and deletion behavior. Those steps remain future work.
 
-## Vercel deployment steps
+## Vercel deployment
 
-The verified release was deployed manually; automatic Git deployment was not verified.
+1. Push the intended commit to GitHub.
+2. Link the project with `npx vercel link --yes --project customer-pulse-ai`.
+3. Add optional secrets in Vercel Project Settings; do not commit `.env.local` or `.vercel/`.
+4. Run `npx vercel deploy --prod --yes`.
+5. Confirm `READY`, the production alias and `/api/health` provider modes.
+6. Run `$env:PLAYWRIGHT_BASE_URL='https://customer-pulse-ai-eight.vercel.app'; npx playwright test --workers=1`.
 
-1. Push the desired commit to `sky12ler/CustomerPulse-AI`.
-2. Authenticate with `npx vercel whoami` and complete the device flow if required.
-3. Link with `npx vercel link --yes --project customer-pulse-ai`.
-4. Add optional application secrets in Vercel Project Settings. Do not commit `.env.local` or `.vercel/`.
-5. Deploy with `npx vercel deploy --prod --yes`.
-6. Confirm the deployment is Ready and aliased to `https://customer-pulse-ai-eight.vercel.app`.
-7. Confirm `/api/health` reports the intended provider modes, then rerun `PLAYWRIGHT_BASE_URL=https://customer-pulse-ai-eight.vercel.app npx playwright test`.
+This release used the authenticated Vercel CLI. Automatic Git-to-Vercel deployment was not independently observed.
 
-## Demo accounts
+## Demo accounts and scenarios
 
-The deployed no-credential demo uses the `Demo account` role selector; no login or password is needed:
+The deployed UI has no login/password. Use the persisted Demo account selector: Administrator, Sales Manager, Marketing Manager, Account Executive or Auditor.
 
-- Administrator
-- Sales Manager
-- Marketing Manager
-- Account Executive
-- Auditor
-
-The optional Supabase seed defines demo users separately, but Supabase Auth is not connected to the verified deployed UI.
-
-## Demo scenarios
-
-- Scenario A: Maya Tan retention recovery from conversation evidence through approval, WhatsApp demo execution, outcome, and audit.
-- Scenario B: Grounded growth recommendation/draft using synthetic evidence.
-- Scenario C: Segment-decline insight through seven-stage campaign creation, separate approval, Demo Publisher scheduling, highlighted calendar record, and audit.
-- Scenario D: Observed recovery and analytics reporting without unsupported causal claims.
+- Scenario A: Maya Tan conversation evidence -> AVO -> alert/recommendation -> Changes Requested/revision -> approval -> start -> execution -> response -> outcome -> recalculation/audit.
+- Scenario B: grounded Growth recommendation using synthetic evidence.
+- Scenario C: segment-decline insight -> seven-step campaign -> different-user approval -> Demo Publisher -> highlighted calendar/audit.
+- Scenario D: Omar Aziz approved recovery -> start -> execution -> response -> Purchase completed outcome -> actual risk/metric/analytics update -> Reset.
 
 ## Remaining limitations
 
-- Live OpenAI/GPT-5.6 responses were not tested because no API key was available; Demo AVO fallback was tested.
-- Live Buffer publishing/status callbacks were not tested because no Buffer credentials were available; Demo Publisher was tested.
-- Supabase Auth, database persistence, Storage, and RLS are not connected to the UI and were not production-tested.
-- WhatsApp and email actions are audited demo simulations, not real external sends.
-- CRM synchronization, image generation, and advanced image processing are not implemented/verified.
-- Demo data and workflow state are synthetic and browser-local, so they do not synchronize across browsers or devices and are cleared with site storage/reset.
-- Automatic Git-to-Vercel deployment was not observed for this release; the production deployment used the authenticated Vercel CLI.
-
-## Phase 1 dynamic operational pipeline handoff
-
-Implemented: shared persisted operational datasets; Demo/Imported separation; provenance; incremental idempotent imports; authoritative tier/churn engines; validated AVO signal conversion; idempotent alerts; monitored state; versioned Changes Requested loop; separate approval/start/execution/response/outcome; actual post-outcome recalculation; dynamic analytics selectors; Reset Demo preserving imports; no-upload demo; multi-file Quick Import.
-
-Local verification on 2026-07-19: ESLint passed; TypeScript passed; 94/94 unit tests passed; 31/31 Playwright tests passed; production build passed; npm audit found 0 vulnerabilities; tracked-file secret scan found no credential patterns.
-
-External limitations: no credentialed OpenAI, Buffer, Supabase, WhatsApp, or email provider was exercised. Demo AVO and Demo Publisher are the verified fallbacks. Browser demo persistence is local to one browser/device. Background scheduled monitoring and ZIP bundle import remain future work.
-
-Production source commit: `391b489` (implementation commit `f860695`). Production URL: `https://customer-pulse-ai-eight.vercel.app`. Deployment ID: `dpl_Hn4Je6fkDNQT7j18H9wXZTNYvwdW`. Production Playwright acceptance: 5/5 workflows passed, including customer/transaction/conversation/document imports, Maya AVO plus revision/approval/start/execution/response/outcome, marketing scheduling, UX/mobile, and Omar calculated recovery with alert downgrade/resolution.
-
-## Phase 2 customer workspace acceptance
-
-Phase 2 adds customer-specific URLs, semantic and keyboard-accessible navigation, URL-backed Customer 360 tabs, filter/sort/page restoration, advanced operational filters and sorting, summary insights, pagination, mobile cards, scoped export, ERAR-v1 calculation details, and explicit Not Found/Access Denied states. It preserves the Phase 1 authoritative operational store and existing Customer 360 tab content.
-
-Demo assignment policy: Account Executive -> Aisha Rahman. That scope is enforced in the shared provider, lookups, conversations, alerts, recommendations, actions, AVO requests, exports, and relevant audit views. Administrator and Sales Manager have wider authorized demo scope; Auditor remains read-only. Supabase migration `202607190002_customer_assignment_rls.sql` adds assignment-aware RLS and ERAR-v1 fields, but Supabase runtime persistence is still not connected or live-tested.
-
-Phase 2 local gates on 19 July 2026: ESLint passed; TypeScript passed; 109/109 unit tests passed; 44/44 Playwright tests passed; optimized production build passed; npm audit found zero vulnerabilities; secret scan found no real key or private key. Production deployment verified: commit `5a22d05b759808f4fa97727c85de472257d84c30`, deployment `dpl_4fAFL7gYHYVNC2Kt1XejBaLucY3K`, Ready and aliased to `https://customer-pulse-ai-eight.vercel.app`. The public Phase 2 suite passed 13/13 in 25.6 seconds; `/api/health` returned `status: ok`, `avoProvider: demo`, and `publisher: demo`.
+- Live OpenAI/GPT-5.6 responses were not tested because no API key was available; Demo AVO is the verified mode.
+- Live Buffer publishing/callbacks were not tested; Demo Publisher is the verified mode.
+- Supabase Auth, persistence, Storage and remote RLS are supplied as deployment artifacts but are not connected or production-tested.
+- WhatsApp/email are user-initiated or staff-confirmed demo actions, not verified external sending/ingestion.
+- Browser-local state does not synchronize across users, browsers or devices.
+- CRM sync, background monitoring, ZIP import, image generation and advanced image processing are not implemented or verified.

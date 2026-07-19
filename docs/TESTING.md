@@ -1,73 +1,77 @@
 # Testing
 
+Final regression date: 19 July 2026 (Asia/Kuala Lumpur).
+
 ## Commands
 
 ```bash
 npm run lint
 npm run typecheck
 npm test
-npm run build
 npm run test:e2e
+npm run build
 npm audit --audit-level=low
 ```
 
-`npm run test:e2e` builds the optimized application, starts it on an isolated local port, executes Chromium, and stops the server.
+`npm run test:e2e` builds the optimized application, starts it on an isolated local port, runs Chromium and stops the server. To test an existing deployment without starting a local server in PowerShell:
 
-## Verified result — 19 July 2026
-
-| Check            | Result                             |
-| ---------------- | ---------------------------------- |
-| ESLint           | Pass, zero warnings/errors         |
-| TypeScript       | Pass                               |
-| Vitest           | 12 files, 109/109 pass             |
-| Playwright       | 44/44 local production-mode pass   |
-| Production build | Pass                               |
-| npm audit        | 0 vulnerabilities                  |
-| Secret scan      | No real secret/private key matches |
-
-The 109 unit tests validate tier/churn boundaries, consent, evidence integrity, prompt-injection removal, AVO abstention/live request construction, publisher approval/idempotency, Supabase schema controls, and every permanent import: customers.csv, transactions.csv, conversations.csv/JSON, products.csv, campaign-results.csv, four PDFs, and the campaign PNG, plus XLSX/DOCX/TXT and invalid/disguised/oversized cases.
-
-The 13 Phase 2 customer tests plus 26 numbered release tests map directly to the requested acceptance list; four additional tests exercise the complete production A-D workflows: role persistence; Administrator/Sales/Marketing uploads; invalid and successful import states; recommendation/action linkage and query highlighting; self-approval and execution gates; trigger prefill; seven-step validation/draft persistence/approval; ScheduledPost creation/calendar insertion/highlighting; marketing evidence/uncertainty; filter-linked analytics; requester/approver/executor audit; Scenario A and C walkthroughs; mobile; and preserved Scenarios B/D.
-
-## Production verification
-
-Local production-mode success is not production deployment evidence. After each Vercel release, verify `/api/health` reports `workflow-v2` and repeat the three named uploads plus both end-to-end workflows. Record provider mode from health: `avoProvider: demo|openai`, `publisher: demo|buffer`.
-
-## Verified production run
-
-After the GitHub push and authenticated Vercel CLI deployment, Vercel health reported `release: workflow-v2`, `avoProvider: demo`, and `publisher: demo`. The same 31 Playwright tests passed directly against `https://customer-pulse-ai-eight.vercel.app` in 49.7 seconds, including the three required production uploads.
-
-## Phase 1 verification commands
-
-```bash
-npm run lint
-npm run typecheck
-npm test -- --run
-npm run test:e2e
-npm run build
-npm audit --audit-level=moderate
+```powershell
+$env:PLAYWRIGHT_BASE_URL='https://customer-pulse-ai-eight.vercel.app'
+npx playwright test --workers=1
 ```
 
-The Phase 1 suite includes explicit coverage for the 40 requested import, AVO, alert, revision, lifecycle, recalculation, RBAC, and audit behaviours. Latest local run: 10 unit-test files / 94 tests passed; 31 Playwright tests passed; lint, TypeScript, and production build passed; npm audit reported zero vulnerabilities. The tracked-file secret scan returned no matches.
+## Final results
 
-## Phase 2 verification - 19 July 2026
+| Check | Result |
+| --- | --- |
+| ESLint | Passed, zero errors |
+| TypeScript | Passed with `tsc --noEmit` |
+| Vitest | 12 files, 109/109 tests passed |
+| Local Playwright | 45/45 passed against the optimized production server in 32.1 seconds |
+| Production Playwright | 45/45 passed against public Vercel in 1.4 minutes |
+| Local production build | Passed |
+| Vercel production build | Passed; deployment Ready |
+| npm audit | 0 vulnerabilities at `--audit-level=low` |
+| Secret scan | 0 credential-like/private-key matches in source scope |
 
-| Check            | Result                                                              |
-| ---------------- | ------------------------------------------------------------------- |
-| ESLint           | Pass, zero warnings/errors                                          |
-| TypeScript       | Pass                                                                |
-| Vitest           | 12 files, 109/109 pass                                              |
-| Playwright       | 44/44 pass against local optimized production server                |
-| Production build | Pass                                                                |
-| npm audit        | 0 vulnerabilities                                                   |
-| Secret scan      | No real key/private-key match; one explicit non-secret test fixture |
+Production reference:
 
-The 13 Phase 2 Playwright cases cover the requested 40 behaviors through grouped end-to-end assertions: semantic links and View Customer, mouse/Enter/Space rows, refresh/deep tabs/Not Found, URL-backed filter restoration, all filter controls and empty state, metrics/pagination, default and selected sorting with `aria-sort`, ERAR tooltip/details, Account Executive direct-URL/API/export denial, Administrator/Sales Manager scope, Auditor read-only behavior, Overview navigation, mobile cards, and horizontal overflow. The same run also executes the 31 preserved production-acceptance/release tests for imports, retention, marketing, UX, and Scenarios A-D.
+- URL: https://customer-pulse-ai-eight.vercel.app
+- Application commit: `0e7225d4b1208c3196a991bc48184969f96b6b32`
+- Deployment: `dpl_Bz4gAtdCwcV4H497JCwBDq6vDWmK`
+- Health: `workflow-v2`, Demo AVO, Demo Publisher
 
-Unit additions verify demo assignment and lookup semantics, action scoping, Auditor AVO denial, all seeded ERAR-v1 identities including Maya, formula clamping, reasoned override audit output, default ordering, compatible filters, sort directions, and static Supabase assignment-policy structure.
+## Coverage map
 
-These results are local production-mode evidence. Public Vercel verification must set `PLAYWRIGHT_BASE_URL=https://customer-pulse-ai-eight.vercel.app` and rerun the relevant suite after deployment; document failures rather than treating local success as production success.
+The 109 unit tests cover:
 
-### Phase 2 public production result
+- permanent mock imports and CSV/JSON/XLSX/TXT/PDF/DOCX/image validation paths;
+- deterministic tier/churn boundaries, score changes and ERAR-v1;
+- operational import mutation, provenance, idempotency and affected-customer recalculation;
+- evidence validation and AVO signal validation/review status;
+- alert create/update/resolve/reopen and duplicate prevention;
+- Changes Requested, approval, Start, execution, response, outcome and audit transition rules;
+- real outcome recalculation plus response/outcome analytics source records;
+- consent, provider abstention, prompt-injection removal, publisher approval/idempotency;
+- customer assignment scope, export selectors and Supabase migration/RLS structure.
 
-Deployment `dpl_4fAFL7gYHYVNC2Kt1XejBaLucY3K`, source commit `5a22d05b759808f4fa97727c85de472257d84c30`: 13/13 Phase 2 Playwright tests passed directly against `https://customer-pulse-ai-eight.vercel.app` in 25.6 seconds. Health returned `status: ok`, `avoProvider: demo`, and `publisher: demo`. This production run covers Customer navigation/deep links, tabs/refresh, filters/sorts/state restoration, pagination, ERAR details, Account Executive URL/API/export denial, manager/admin scope, Auditor read-only behavior, Overview navigation, and mobile overflow. The full current 44-test suite passed locally; only the 13-test Phase 2 file was rerun on this deployment.
+The 45 browser tests comprise:
+
+- 1 cross-phase Imported Workspace pipeline test;
+- 13 Customer/Customer 360 Phase 2 tests;
+- 5 production acceptance workflows covering imports, Maya retention, marketing, UX and Omar dynamic recovery/reset;
+- 26 numbered release tests covering roles, uploads, validation, recommendation/action linking, approval/execution gates, campaigns, analytics, audit, guided scenarios and mobile.
+
+## Important interpretation
+
+“Dynamic recalculation” means the underlying operational record changes or the authoritative engine runs against newly stored data and writes the actual result. A rounded risk score is not forced to change when evidence weight is insufficient. Tests inspect persisted operational signals and before/after audit values rather than asserting a fabricated score movement.
+
+The production run used a clean browser context per test. Browser localStorage is the verified persistence layer, so production results do not prove cross-device, multi-user or database persistence.
+
+## Security scan scope
+
+The final regex scan excluded dependencies, build output, `.git`, ignored `.env*` files and `package-lock.json`, and searched source files for private-key headers, OpenAI-style keys and populated high-risk application secret assignments. It returned zero matches. Real environment values were not printed.
+
+## External modes not tested
+
+No API credentials were available. Live OpenAI/GPT-5.6, Buffer publishing/callbacks and remote Supabase behavior were not exercised. The verified health modes were `avoProvider: demo` and `publisher: demo`.

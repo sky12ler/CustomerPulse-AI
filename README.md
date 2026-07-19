@@ -103,7 +103,7 @@ The Data Import Centre is a four-stage wizard with type-specific RBAC. Invalid A
 - **A — Strategic customer at risk:** Maya Tan has declining activity, two unresolved delivery complaints, negative sentiment, a missed commitment, competitor language, and cancellation language. AVO recommends service recovery before promotion; approval and consent gate the WhatsApp action.
 - **B — Growth opportunity:** Ethan Lim has positive sentiment, strong activity, product interest, and an Analytics Suite gap. AVO creates a catalogue-grounded outreach draft for review.
 - **C — Segment decline:** the synthetic North / Food & beverage segment crosses configured risk, revenue, frequency, engagement, and shared-objection thresholds. Marketing reviews a source-grounded campaign and schedules it through Demo Publisher.
-- **D — Successful recovery:** Omar Aziz has a recorded approved recovery, positive response, new purchase, High-to-Medium risk change, and estimated recovered revenue shown in Analytics.
+- **D - Observed recovery:** Omar Aziz begins with an approved recovery action and a calculated High-risk monitoring state. After staff separately start, execute, record his response and record a Purchase completed outcome, the real churn engine updates his customer state and Analytics changes to Successful recovery.
 
 ## Testing
 
@@ -120,8 +120,8 @@ npm audit
 Final verification passed:
 
 - **109/109 unit tests** across imports, tier/churn boundaries, AVO safeguards, workflows, scenarios, publisher behavior, mock data, and required Supabase security structure.
-- **44/44 local production-mode browser tests** cover the Phase 2 customer cases plus all preserved numbered workflow acceptance cases, Scenarios A–D, persistence, multipart CSV/PDF imports, approval/execution gates, shared calendar records, audit history, guided demos, and mobile navigation.
-- **30/30 tests also passed against the public Vercel `workflow-v2` deployment**, including the required customers.csv, conversations.csv, and product-catalogue.pdf uploads.
+- **45/45 local production-mode browser tests** cover the cross-phase operational pipeline, Phase 2 customer cases, all preserved numbered workflow acceptance cases, Scenarios A-D, persistence, CSV/PDF imports, approval/execution gates, shared calendar records, audit history, guided demos, reset and mobile navigation.
+- **45/45 tests also passed against the public Vercel `workflow-v2` deployment**, including customers.csv, transactions.csv, conversations.csv and product-catalogue.pdf imports.
 - Lint, strict type checking, production build, and dependency audit; the audit reported zero vulnerabilities at verification time.
 
 See [Testing](docs/TESTING.md) and [Final handoff](docs/FINAL_HANDOFF.md).
@@ -166,4 +166,4 @@ Customers supports accessible search, 11 compatible filters, active chips, URL r
 
 Estimated revenue at risk uses ERAR-v1: eligible forecast revenue for the next 90 days multiplied by normalized churn probability. The list explains the estimate and Customer 360 shows the base, probability, estimate, period, version, calculated time, source, disclaimer, and any reasoned/audited override.
 
-Latest Phase 2 local verification: ESLint and strict TypeScript passed; 12 Vitest files / 109 tests passed; 44/44 Playwright tests passed against an optimized production server; the production build passed; `npm audit --audit-level=low` reported zero vulnerabilities; and the secret scan found only the explicit non-secret test fixture. Public Vercel Phase 2 verification passed 13/13 customer-workspace tests against `https://customer-pulse-ai-eight.vercel.app` on deployment `dpl_4fAFL7gYHYVNC2Kt1XejBaLucY3K`; the result was measured directly and not inferred from local tests.
+Final cross-phase verification: ESLint and strict TypeScript passed; 12 Vitest files / 109 tests passed; 45/45 Playwright tests passed locally and again against `https://customer-pulse-ai-eight.vercel.app`; the production build passed locally and on Vercel; `npm audit --audit-level=low` reported zero vulnerabilities; and the secret scan found zero credential-like/private-key matches in source scope. Production application commit: `0e7225d4b1208c3196a991bc48184969f96b6b32`; deployment: `dpl_Bz4gAtdCwcV4H497JCwBDq6vDWmK`.
