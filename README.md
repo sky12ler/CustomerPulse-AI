@@ -9,7 +9,7 @@ All bundled people and records are synthetic. Privacy-supporting controls are im
 ## What is implemented
 
 - A shared operational store for imported customers, transactions, conversations, products, analyses, alerts, recommendations, retention actions, campaigns, results and audit events.
-- Supabase Auth, row-level access, per-entity persistence, append-only audit insertion and Realtime refresh for the Imported Workspace.
+- An isolated, browser-local Imported Workspace where confirmed uploads drive the complete operational pipeline without login.
 - A separate resettable Synthetic Demo Workspace for credential-free judging.
 - Customer 360 routes at `/customers/[customerId]`, role-scoped access, search, 11 filters, seven sort options, pagination, summary metrics and scoped CSV export.
 - Deterministic tiering, hybrid churn calculation and ERAR-v1: eligible future 90-day revenue multiplied by normalized churn probability.
@@ -25,13 +25,12 @@ All bundled people and records are synthetic. Privacy-supporting controls are im
 
 ```text
 Browser / Next.js UI
-  ├─ Demo Workspace → versioned localStorage operational state
-  └─ Imported Workspace → Supabase Auth + RLS + per-entity JSONB records + Realtime
-                           └─ append-only audit_logs
+  ├─ Demo Workspace → versioned localStorage synthetic state
+  └─ Imported Workspace → versioned localStorage uploaded operational state
 
 Next.js server routes
   ├─ /api/imports/validate → governed file validation and preview
-  ├─ /api/avo/analyze      → authenticated customer lookup → MiMo/OpenAI-compatible AVO
+  ├─ /api/avo/analyze      → supplied browser-local customer → MiMo/OpenAI-compatible AVO
   │                          └─ explicit deterministic fallback
   ├─ /api/publish          → approval gate → Buffer or Demo Publisher
   └─ /api/health           → configured provider availability
@@ -53,30 +52,19 @@ npm run dev
 
 Open `http://localhost:3000`. Demo Workspace works without credentials.
 
-For the real Imported Workspace, configure:
+For live AVO in either workspace, configure:
 
 ```text
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
 XIAOMIMIMO_API_KEY=
 XIAOMIMIMO_BASE_URL=
 XIAOMIMIMO_MODEL=mimo-v2.5
 ```
 
-`SUPABASE_SERVICE_ROLE_KEY` and MiMo credentials are server-only. Never prefix them with `NEXT_PUBLIC_`. The application uses `XIAOMIMIMO_API_KEY`; a provider-specific subscription token that is not accepted by the OpenAI-compatible endpoint will fall back visibly to Demo AVO.
+MiMo credentials are server-only. Never prefix them with `NEXT_PUBLIC_`. A key that is not accepted by the OpenAI-compatible endpoint falls back visibly to Demo AVO.
 
-## Supabase deployment
+## Imported Workspace persistence
 
-Run these files in order in the Supabase SQL Editor:
-
-1. `supabase/migrations/202607180001_initial_schema.sql`
-2. `supabase/migrations/202607190002_customer_assignment_rls.sql`
-3. `supabase/migrations/202607190003_operational_workspace.sql`
-
-The third migration connects the current Imported Workspace model: per-entity records, assignment-aware RLS, Auth profile provisioning, Realtime and append-only audit protection.
-
-Create each account through `/login`. New accounts safely default to `account_executive`. Then copy `supabase/ROLE_SETUP.sql`, replace the example email and role, and run it once per elevated user. Do not expose a client-side “make me administrator” control.
+Imported Workspace is intentionally isolated to the current browser. It requires no account and never exposes a shared anonymous Supabase database. Refreshes preserve the workflow through versioned localStorage; clearing browser storage removes it. The supplied Supabase migrations remain optional future deployment artifacts and are not part of the hackathon walkthrough.
 
 ## Test data
 
@@ -99,11 +87,11 @@ npm run build
 npm audit --audit-level=low
 ```
 
-The current automated baseline is 14 Vitest files / 118 tests and 45 Playwright workflows. See `docs/TESTING.md` for the last completed run and the distinction between local, provider and deployed-production verification.
+The current automated baseline is 14 Vitest files / 119 tests and 45 Playwright workflows. See `docs/TESTING.md` for the last completed run and the distinction between local, provider and deployed-production verification.
 
 ## Deployment
 
-Push the repository to GitHub, add the same environment variables in Vercel Project Settings and redeploy. After deployment, verify `/api/health`, log in, use Imported Workspace, import the scenario pack, run AVO, refresh in a second tab and confirm the same operational records remain.
+Push the repository to GitHub, add the MiMo variables in Vercel Project Settings and redeploy. Verify `/api/health`, select Imported Workspace, import the scenario pack, run AVO and refresh the same browser to confirm the operational records remain.
 
 ## External boundaries
 

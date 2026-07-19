@@ -544,6 +544,8 @@ export function DemoWorkflowProvider({
           ? "Resolve validated service issues before any promotional outreach"
           : types.has("Price objection")
             ? "Arrange a staff-led value review using approved product information"
+            : types.has("Product interest")
+              ? "Review the expressed product interest using the approved catalogue"
             : customer.productGap
               ? `Offer a staff-led review of ${customer.productGap} using the approved catalogue`
               : "Complete an evidence-led customer follow-up";

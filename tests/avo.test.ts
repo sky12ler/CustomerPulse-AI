@@ -47,6 +47,36 @@ describe("AVO providers", () => {
       "MSG-A-104",
     );
   });
+  it("derives imported-workspace fallback findings from message text rather than seeded scenarios", async () => {
+    const imported = {
+      ...customers[0],
+      id: "IMP-RISK-001",
+      scenario: undefined,
+      messages: [
+        {
+          ...customers[0].messages[0],
+          id: "IMP-MSG-1",
+          text: "The complaint is unresolved and the replacement is late again.",
+          evidence: true,
+        },
+        {
+          ...customers[0].messages[1],
+          id: "IMP-MSG-2",
+          text: "Friday passed with no update. We are speaking with a competitor and may cancel.",
+          evidence: true,
+        },
+      ],
+    };
+    const out = await new DemoAVOProvider().analyze(imported);
+    expect(out.analysis.complaints).not.toHaveLength(0);
+    expect(out.analysis.cancellation_signals).not.toHaveLength(0);
+    expect(out.analysis.competitor_mentions).not.toHaveLength(0);
+    expect(out.analysis.missed_follow_ups).not.toHaveLength(0);
+    expect(out.analysis.evidence.map((item) => item.message_id)).toEqual([
+      "IMP-MSG-1",
+      "IMP-MSG-2",
+    ]);
+  });
   it("abstains when no eligible evidence exists", async () => {
     const c = customers.find((x) => x.messages.every((m) => !m.evidence))!;
     const out = await new DemoAVOProvider().analyze(c);

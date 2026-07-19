@@ -44,6 +44,14 @@ export type ResponseTransport = (
 export class DemoAVOProvider implements AIProvider {
   name = "AVO Demo Provider";
   async analyze(c: Customer) {
+    const corpus = c.messages.map((message) => message.text).join(" ");
+    const serviceIssue = /complaint|late|replacement|unresolved|issue/i.test(corpus);
+    const cancellation = /\bcancel|leave|churn/i.test(corpus);
+    const competitor = /competitor/i.test(corpus);
+    const missedFollowUp = /passed with no update|missed|no update/i.test(corpus);
+    const priceObjection = /price|expensive|value.+justify|difficult to justify/i.test(corpus);
+    const productInterest = /analytics|product|approved .+ option|show us/i.test(corpus);
+    const recovery = /issue is resolved|resolved.+order|next order/i.test(corpus);
     const evidence = c.messages
       .filter((m) => m.evidence)
       .map((m) => ({
@@ -63,11 +71,13 @@ export class DemoAVOProvider implements AIProvider {
       analysis: {
         concise_summary: insufficient
           ? "Insufficient evidence—staff review required."
-          : c.scenario === "A"
+          : c.scenario === "A" || (serviceIssue && cancellation)
             ? "The customer reports two unresolved delivery issues, a missed promised update, competitor evaluation, and possible cancellation."
-            : c.scenario === "B"
+            : c.scenario === "B" || productInterest
               ? "Positive adoption and an explicit request for campaign analytics indicate a grounded cross-sell opportunity."
-              : "The available conversation and behavioural indicators have been summarized for staff review.",
+              : recovery
+                ? "The customer reports issue resolution and a subsequent order; staff should verify the recorded outcome."
+            : "The available conversation and behavioural indicators have been summarized for staff review.",
         sentiment_label: c.sentiment,
         sentiment_score:
           c.sentiment === "Positive"
@@ -77,32 +87,38 @@ export class DemoAVOProvider implements AIProvider {
               : 0,
         sentiment_trend: c.sentiment === "Negative" ? "Worsening" : "Stable",
         primary_intent:
-          c.scenario === "A"
+          c.scenario === "A" || serviceIssue
             ? "Service resolution"
-            : c.scenario === "B"
+            : c.scenario === "B" || productInterest
               ? "Product discovery"
               : "Account update",
         complaints:
-          c.scenario === "A"
-            ? ["Repeated late delivery", "Replacement not received"]
+          c.scenario === "A" || serviceIssue
+            ? ["Customer-reported unresolved service or delivery issue"]
             : [],
         unresolved_issues:
-          c.scenario === "A"
-            ? ["Replacement status", "Missed promised update"]
+          c.scenario === "A" || serviceIssue
+            ? ["Service resolution requires staff verification"]
             : [],
-        product_interests: c.productGap ? [c.productGap] : [],
+        product_interests: c.productGap
+          ? [c.productGap]
+          : productInterest
+            ? ["Approved analytics option"]
+            : [],
         price_objections:
-          c.scenario === "C"
+          c.scenario === "C" || priceObjection
             ? ["Current package price is difficult to justify"]
             : [],
-        competitor_mentions: c.scenario === "A" ? ["Unnamed competitor"] : [],
+        competitor_mentions:
+          c.scenario === "A" || competitor ? ["Unnamed competitor"] : [],
         cancellation_signals:
-          c.scenario === "A" ? ["May cancel support contract"] : [],
+          c.scenario === "A" || cancellation ? ["Customer may cancel"] : [],
         urgency: c.risk,
-        staff_commitments:
-          c.scenario === "A" ? ["Confirm replacement status by Friday"] : [],
+        staff_commitments: /will update|by Friday/i.test(corpus)
+          ? ["Staff promised an update by Friday"]
+          : [],
         missed_follow_ups:
-          c.scenario === "A" ? ["Friday update was missed"] : [],
+          c.scenario === "A" || missedFollowUp ? ["Promised update appears missed"] : [],
         recommended_tags: [c.risk.toLowerCase(), c.sentiment.toLowerCase()],
         evidence,
         analysis_confidence: insufficient ? 0.35 : c.confidence / 100,

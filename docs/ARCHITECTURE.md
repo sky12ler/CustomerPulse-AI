@@ -14,9 +14,8 @@ CustomerPulse AI is a Next.js App Router application with a shared, versioned op
              ┌─────────────────┘               └──────────────────┐
              ▼                                                    ▼
   Synthetic Demo Workspace                            Imported Workspace
-  versioned localStorage                              Supabase Auth session
-  isolated + resettable                               per-entity records + RLS
-                                                      Realtime + audit_logs
+  versioned localStorage                              versioned localStorage
+  isolated + resettable                               isolated uploaded records
              │                                                    │
              └──────────────────────┬─────────────────────────────┘
                                     ▼
@@ -52,9 +51,9 @@ authorised conversations ─────> AVO analysis ──> evidence validati
 
 ## Persistence and access
 
-For authenticated Imported Workspace, `lib/workspace-persistence.ts` serializes each entity separately into `operational_entity_records`. Supabase RLS scopes by organisation, role and assigned profile. A database trigger resolves imported customer assignment from staff identity where possible. Realtime notifies other sessions, while local writes are debounced and tagged with the authenticated updater. Audit rows are inserted separately with before/after values and cannot be updated or deleted by normal application roles.
+Both workspaces use separate keys inside one versioned browser state. Imported records survive routes and refreshes in that browser but are not shared between visitors. The server receives an imported customer only when the same browser explicitly asks for AVO analysis; that request does not grant or perform any Supabase database access. The on-screen role selector enforces the walkthrough’s role, assignment, approval and export rules.
 
-The server AVO route validates the Supabase bearer session and retrieves an imported customer through RLS. A caller-supplied demo role does not grant imported-customer access.
+Supabase migrations and adapters remain in the repository as optional future deployment work. They are not required or claimed by the selected public hackathon workflow.
 
 ## Provider boundaries
 

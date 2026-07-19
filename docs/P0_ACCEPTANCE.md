@@ -14,7 +14,7 @@ Verification date: 19 July 2026. “Verified” below means covered by an observ
 | Outcome recalculation | Stored outcome invokes real recalculation and updates score/alert/metrics/analytics using actual before/after | Browser + unit verified |
 | Customer entry and persistence | Semantic links and accessible rows open `/customers/[customerId]`; route/tab survives refresh | Browser verified |
 | Customer operations | Scoped search/filter/sort/pagination/metrics/export use current operational records | Browser verified |
-| Account Executive scope | Assigned records only across list, direct URL, AVO, actions, export and Supabase RLS | Browser + schema verified |
+| Account Executive scope | Assigned records only across list, direct URL, AVO, actions and export in the browser-local walkthrough | Browser verified |
 | Dynamic Marketing Intelligence | Active data is grouped by segment and compared to calculated baseline/current signals; no threshold match yields no insight | Unit + browser verified |
 | Consent-safe audience | Inclusion uses selected segment, current consent and channel availability; every exclusion has a reason | Unit + browser verified |
 | Correct Campaign Studio context | Navigation shows list/blank; insight creates prefilled campaign; ID opens exact campaign | Browser verified |
@@ -30,15 +30,14 @@ Verification date: 19 July 2026. “Verified” below means covered by an observ
 
 - ESLint: passed.
 - TypeScript: passed.
-- Vitest: 14 files, 118/118 passed.
+- Vitest: 14 files, 119/119 passed.
 - Production build: passed.
 - Playwright: 45/45 passed against the optimized local production server.
 - MiMo: minimal OpenAI-compatible request succeeded with `mimo-v2.5`; browser Scenario B also completed the AVO route during regression.
-- npm audit: 0 vulnerabilities at low threshold. Secret scan passed with `.env.local` ignored and untracked. Vercel regression passed 44/45; authenticated Imported Workspace AVO remains pending a real Auth user and returned the expected unauthenticated 401.
+- npm audit: 0 vulnerabilities at low threshold. Secret scan passed with `.env.local` ignored and untracked. The browser-local Imported Workspace change must be redeployed before the Vercel regression is rerun.
 
 ## Manual production prerequisites
 
-- `202607190003_operational_workspace.sql` was applied by the project owner on 19 July 2026.
-- Create Auth accounts and assign elevated roles with `supabase/ROLE_SETUP.sql`.
+- Update the three MiMo variables in Vercel to the locally working values.
 - Push and redeploy to Vercel.
-- Run the production browser regression. Until then, local success is not described as production success.
+- Run the production browser regression. No Auth account is required.

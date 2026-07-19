@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import Link from "next/link";
 import { getSupabaseAccessToken } from "@/lib/supabase-browser";
 import {
   AlertTriangle,
@@ -428,8 +427,8 @@ function DashboardInner({ initialPage }: { initialPage: string }) {
                   ? "Synthetic Demo Workspace"
                   : "Imported Workspace"}
               </span>
-              <span className={`demo-label ${demo.persistence.status === "error" ? "danger" : ""}`} title={demo.persistence.error || "Imported Workspace persistence status"}>
-                {demo.persistence.mode === "supabase" ? `Supabase · ${demo.persistence.status}` : demo.persistence.configured ? "Local · sign in for Supabase" : "Local browser storage"}
+              <span className="demo-label" title="Workspace data stays in this browser and is not shared anonymously">
+                {state.activeWorkspace === "imported" ? "Browser-local imported data" : "Local browser storage"}
               </span>
               <select
                 aria-label="Active workspace"
@@ -468,11 +467,10 @@ function DashboardInner({ initialPage }: { initialPage: string }) {
                 aria-label="Demo account"
                 className="input"
                 value={role}
-                disabled={state.activeWorkspace === "imported" && demo.persistence.authenticated}
-                title={state.activeWorkspace === "imported" && demo.persistence.authenticated ? "Role is controlled by the signed-in Supabase account" : "Switch synthetic demo role"}
+                title="Switch synthetic walkthrough role"
                 onChange={(e) => {
                   demo.setRole(e.target.value as Role);
-                  notify(`Signed in as ${e.target.value} demo account`);
+                  notify(`Using ${e.target.value} walkthrough role`);
                 }}
               >
                 <option>Administrator</option>
@@ -481,11 +479,6 @@ function DashboardInner({ initialPage }: { initialPage: string }) {
                 <option>Account Executive</option>
                 <option>Auditor</option>
               </select>
-              {demo.persistence.authenticated ? (
-                <button className="btn btn-outline" title={demo.persistence.email} onClick={() => void demo.signOut()}>Sign out</button>
-              ) : (
-                <Link className="btn btn-outline" href="/login">Sign in</Link>
-              )}
               <div className="avatar">
                 {role
                   .split(" ")

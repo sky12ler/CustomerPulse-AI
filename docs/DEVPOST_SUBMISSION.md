@@ -20,11 +20,11 @@ Risk signals are often fragmented across purchases, complaints, conversations an
 - Enforces changes/revision, different-user approval, separate execution states, consent checks and outcome recording.
 - Calculates segment opportunities from current data and creates consent/channel-filtered campaign audiences.
 - Supports a seven-step campaign, campaign-specific approval/history, Demo Publisher scheduling, calendar management, publish confirmation and imported results.
-- Uses Supabase Auth/RLS/Realtime persistence for Imported Workspace and a resettable synthetic Demo Workspace for judging.
+- Provides a resettable synthetic Demo Workspace and a separate browser-local Imported Workspace driven by the judge’s uploads, without login.
 
 ## 5. How it was built
 
-The UI and server use Next.js App Router, React and strict TypeScript. Domain modules isolate import validation, deterministic tier/churn/ERAR, alerts, marketing calculations, approvals, AVO providers and publishers. Supabase stores Imported Workspace entities as role-scoped JSONB records and append-only audit rows. The AVO server route authenticates imported-customer access before sending only authorised evidence to an OpenAI-compatible provider; validated fallback output is explicitly labelled.
+The UI and server use Next.js App Router, React and strict TypeScript. Domain modules isolate import validation, deterministic tier/churn/ERAR, alerts, marketing calculations, approvals, AVO providers and publishers. Imported records remain isolated in versioned browser storage. The AVO route accepts the current browser’s selected customer evidence, validates the structured result and labels any fallback explicitly.
 
 ## 6. How Codex was used
 
@@ -48,9 +48,9 @@ GPT-5.6 powered the Codex development work in this session. The application runt
 - Converted the marketing workflow from a pre-seeded conclusion into calculated opportunities and audiences.
 - Converted new recommendations into customer/analysis-specific records.
 - Implemented a full retention feedback loop in which recorded outcomes run the real risk engine.
-- Added Supabase Auth, role-aware Imported Workspace persistence, Realtime updates and append-only audit writes.
+- Added a complete upload-driven Imported Workspace pipeline with operational audit history and no login dependency.
 - Built connected mixed-risk upload cases covering risk, growth, privacy, abstention, stability and recovery.
-- Reached a verified local baseline of 118 unit tests; final browser/security/production counts are copied from `docs/TESTING.md` only after completion.
+- Reached a verified local baseline of 119 unit tests; final browser/security/production counts are copied from `docs/TESTING.md` only after completion.
 
 ## 10. What we learned
 
@@ -66,7 +66,7 @@ Trustworthy AI products need visible boundaries. Evidence must be resolvable, ca
 
 ## 12. Built with
 
-Codex, GPT-5.6 (development), Next.js App Router, React, TypeScript, Xiaomi MiMo OpenAI-compatible API, Zod, Supabase Auth/PostgreSQL/RLS/Realtime, Demo Publisher, Buffer adapter, Recharts, ExcelJS, Papa Parse, pdf-parse, Mammoth, Vitest, Playwright, ESLint, GitHub and Vercel.
+Codex, GPT-5.6 (development), Next.js App Router, React, TypeScript, Xiaomi MiMo OpenAI-compatible API, Zod, browser localStorage, Supabase schema artifacts, Demo Publisher, Buffer adapter, Recharts, ExcelJS, Papa Parse, pdf-parse, Mammoth, Vitest, Playwright, ESLint, GitHub and Vercel.
 
 ## 13. Demo
 
@@ -75,14 +75,13 @@ Use the under-three-minute script in `docs/DEMO_SCRIPT.md`. It demonstrates Maya
 ## Devpost checklist
 
 - [ ] Push the final reviewed commit to the public GitHub repository.
-- [ ] Apply Supabase migration 003 and assign Auth roles.
-- [ ] Redeploy Vercel with Supabase and MiMo variables.
+- [ ] Redeploy Vercel with the verified MiMo variables.
 - [ ] Run the deployed 45-test regression and copy only observed results into the handoff.
 - [ ] Verify `/api/health` and one AVO result’s actual provider/fallback label.
 - [ ] Record a video under three minutes using `docs/DEMO_SCRIPT.md`.
 - [ ] Add production URL, repository URL, screenshots and video URL.
 - [ ] Copy the tagline, description, inspiration, build, challenges, accomplishments, learning and future sections from this file.
-- [ ] Use accurate qualifiers: “Demo Publisher,” “MiMo live” only when returned live, and “Imported Workspace/Supabase” only after migration verification.
+- [ ] Use accurate qualifiers: “Demo Publisher,” “MiMo live” only when returned live, and “browser-local Imported Workspace.”
 - [ ] Do not claim Buffer/social delivery, WhatsApp/email delivery, CRM sync, image generation or legal certification.
 - [ ] Confirm `.env.local` is ignored and no key is present in Git history/diff.
 - [ ] Complete any hackathon-specific Codex session field in the Codex app; the application repository does not generate a Codex Session ID.

@@ -18,13 +18,9 @@ export async function POST(req: NextRequest) {
     req.headers.get("authorization"),
     customerId,
   );
-  const importedRequest = suppliedCustomer?.datasetId === "imported";
-  const localRequest = ["localhost", "127.0.0.1"].includes(req.nextUrl.hostname);
-  if (importedRequest && !authenticated && !localRequest)
-    return NextResponse.json(
-      { error: "Authenticated Supabase access is required for Imported Workspace AVO" },
-      { status: 401 },
-    );
+  // A browser-local imported customer is supplied by the same user who
+  // uploaded it. This path never reads or mutates Supabase. When a bearer
+  // token exists, the RLS-protected database record remains authoritative.
   const effectiveRole = authenticated?.role ?? role;
   const customer = authenticated?.customer ??
     suppliedCustomer ?? customers.find((c) => c.id === customerId);

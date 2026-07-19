@@ -924,6 +924,7 @@ export function signalsFromAnalysis(
     ["Competitor mention", /competitor/i, 0.9],
     ["Cancellation intent", /cancel|leave|churn/i, 1],
     ["Price objection", /price|expensive|value/i, 0.7],
+    ["Product interest", /analytics|approved .+ option|product discovery/i, 0.5],
     ["Missed staff commitment", /passed with no update|missed/i, 0.8],
     [
       "Negative sentiment",

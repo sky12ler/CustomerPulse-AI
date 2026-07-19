@@ -8,7 +8,7 @@ Verification date: 19 July 2026 (Asia/Kuala Lumpur).
 - Application commit: `d6da5abb886dd12b206c0d25b74284d9f513972d`
 - Vercel deployment: `dpl_6MqwibC3xoubFfs8gAKmfHzqE4mg` (`READY`, production)
 - Local MiMo connection: verified against the configured OpenAI-compatible endpoint with model `mimo-v2.5`
-- Supabase runtime: migration 003 was applied by the project owner; Auth users and roles remain required before authenticated persistence can be production-verified
+- Imported Workspace mode: browser-local by product decision; no login or shared anonymous Supabase access
 
 ## Problems found during the user walkthrough and resolution
 
@@ -17,7 +17,7 @@ Verification date: 19 July 2026 (Asia/Kuala Lumpur).
 | Customers were report-only rows | Customer name links, View Customer links, row mouse/Enter/Space navigation and `/customers/[customerId]` Customer 360 |
 | No filters, sorting, metrics or pagination | 11 filters, seven sorts, risk-first default, six live metrics, 10/25/50 pagination and result-aware search text |
 | Revenue at risk was unexplained/inconsistent | ERAR-v1 is authoritative across pages and exposes base, risk probability, calculation version, time and disclaimer |
-| Imported state was browser-only | Supabase Auth, per-entity persistence, RLS, Realtime and append-only audit integration for Imported Workspace |
+| Imported state needed a safe demo boundary | Imported records remain isolated in versioned browser storage; no shared anonymous database is exposed |
 | Marketing Intelligence was pre-seeded | Opportunities are grouped and calculated from the active operational customer/transaction/risk data; no threshold match means no manufactured insight |
 | Campaign audience totals ignored consent | Audience inclusion/exclusion is recalculated by segment, current consent and selected channel availability; exclusions include reasons |
 | Campaign Studio always opened CAM-003 | Navigation opens a campaign list/blank state; an insight opens its own prefilled campaign; an existing campaign opens by ID |
@@ -36,10 +36,9 @@ Verification date: 19 July 2026 (Asia/Kuala Lumpur).
 - Dynamic import → deterministic signals/tier → AVO signals → churn/ERAR → alerts pipeline.
 - Governed recommendation/action approval with requester separation, reviewer comments, rejection/change reasons and consent gates.
 - Dynamic segment opportunities, consent-safe campaign audience, seven-step creation, campaign-specific approval, scheduling, publish confirmation and result import.
-- Role persistence in Demo Workspace and database-backed roles in authenticated Imported Workspace.
-- Account Executive assignment scope in UI, APIs, exports and Supabase RLS.
-- Append-only audit writes with actor, role, action, entity, before/after, reason, reviewer and result fields.
-- Resettable demo plus a separate durable Imported Workspace.
+- Walkthrough-role persistence across both workspaces, with scoped Customers, routes, AVO and exports.
+- Operational audit events with actor, role, action, entity, before/after, reason, reviewer and result fields.
+- Resettable demo plus a separate refresh-persistent, browser-local Imported Workspace.
 - Connected mixed-risk import fixtures under `mock-data/scenarios/`.
 
 ## Quality results
@@ -48,24 +47,16 @@ Verification date: 19 July 2026 (Asia/Kuala Lumpur).
 | --- | --- |
 | ESLint | Passed |
 | TypeScript | Passed |
-| Vitest | 14 files, 118/118 passed |
+| Vitest | 14 files, 119/119 passed |
 | Local production build | Passed as part of Playwright runner |
 | Local Playwright | 45/45 passed against an optimized production server in 35.3 seconds |
 | Xiaomi MiMo endpoint | Connected; `mimo-v2.5` returned output |
 | npm audit | 0 vulnerabilities at `--audit-level=low` |
 | Secret scan | Passed; `.env.local` ignored/untracked and no real credential/private-key match |
-| Vercel production regression | 44/45 passed; the only failure was the expected 401 for an unauthenticated Imported Workspace AVO test |
+| Vercel production regression | Previous deployment passed 44/45; the imported AVO login requirement is removed in the pending release and must be rerun |
 | Production MiMo AVO | Explicit Demo fallback observed: Xiaomi attempt returned `401 Invalid API Key`; Vercel credentials/base URL need manual update |
 
 ## Required environment variables
-
-Imported Workspace:
-
-```text
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-```
 
 Live MiMo AVO:
 
@@ -85,15 +76,9 @@ NEXT_PUBLIC_APP_URL=
 
 No variable is required for Synthetic Demo Workspace + Demo AVO + Demo Publisher. Never expose service-role, MiMo or Buffer secrets through `NEXT_PUBLIC_*`.
 
-## Database deployment steps
+## Database deployment
 
-Run in the Supabase SQL Editor, in order:
-
-1. `supabase/migrations/202607180001_initial_schema.sql`
-2. `supabase/migrations/202607190002_customer_assignment_rls.sql`
-3. `supabase/migrations/202607190003_operational_workspace.sql`
-
-Next, create accounts at `/login`. New sign-ups default to Account Executive. For each administrator, sales manager, marketing manager or auditor, edit and run `supabase/ROLE_SETUP.sql`. Sign out/in after a role change so the UI reloads the database role.
+No database or Auth account is required for the selected hackathon workflow. Migration 003 has been applied but the public walkthrough does not read or write the shared database anonymously.
 
 ## Vercel deployment steps
 
@@ -101,14 +86,12 @@ Next, create accounts at `/login`. New sign-ups default to Account Executive. Fo
 2. Confirm all environment variables exist for Production in Vercel.
 3. Redeploy the production branch. Deployment `dpl_6MqwibC3xoubFfs8gAKmfHzqE4mg` currently serves the release.
 4. Check `/api/health`; “configured” means credentials exist, while a completed AVO response proves live use.
-5. Sign in, select Imported Workspace, import the connected scenario pack and refresh in a second session.
+5. Select Imported Workspace, import the connected scenario pack and refresh in the same browser.
 6. Run the 45-test Playwright regression against the production URL and record any environment-only failures honestly.
 
-## Accounts
+## Walkthrough roles
 
-Demo Workspace uses the on-screen roles: Administrator, Sales Manager, Marketing Manager, Account Executive and Auditor. No shared production password is committed.
-
-Supabase users are project-specific. Create them through `/login`; use `ROLE_SETUP.sql` to assign elevated roles. An Account Executive’s profile display name/email must match a customer’s assigned staff value for automatic assignment during import.
+Use the on-screen selector: Administrator, Sales Manager, Marketing Manager, Account Executive and Auditor. These are synthetic workflow roles, not login accounts.
 
 ## Demo scenarios
 
@@ -123,5 +106,5 @@ Supabase users are project-specific. Create them through `/login`; use `ROLE_SET
 - Demo Publisher is an in-app simulator, not social delivery.
 - WhatsApp/email are user-initiated links or staff-confirmed transitions; delivery and inbound responses are not integrated.
 - Image generation/advanced image processing and CRM sync are not implemented.
-- Supabase authenticated persistence cannot be claimed until Auth users/roles exist and the imported AVO regression is rerun with a real bearer session.
+- Imported data is device/browser-local and does not synchronize across browsers or users.
 - MiMo can still fail because of provider quota, model access or endpoint availability; the application reports the fallback instead of hiding it.

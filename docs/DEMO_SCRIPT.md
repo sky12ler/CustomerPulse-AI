@@ -36,7 +36,7 @@ Say: “Start, execution, response and outcome are separate records. The outcome
 
 Open the workspace selector.
 
-Say: “The Synthetic Demo Workspace resets safely. The Imported Workspace uses Supabase Auth, assignment-aware row security, per-entity persistence, Realtime refresh and append-only audit logs. Customer filters, analytics and campaigns use those current imported records.”
+Say: “The Synthetic Demo Workspace resets safely. Imported Workspace needs no login: uploads create an isolated operational dataset in this browser, and Customers, alerts, recommendations, campaigns, analytics and audit all read those current records.”
 
 Show the scenario fixture names under Data Imports or briefly show an imported case if preloaded.
 
@@ -49,4 +49,4 @@ Close: “CustomerPulse is useful beyond a scripted demo: evidence changes opera
 - Never say Buffer posted externally when Demo Publisher is selected.
 - Never say MiMo was live unless the AVO result names the live provider without a fallback reason.
 - Never show `.env.local`, Supabase service-role values or API keys.
-- If demonstrating Imported Workspace, apply migration 003 and user roles first.
+- Imported Workspace is browser-local; do not claim cross-device or multi-user persistence.
