@@ -1161,15 +1161,28 @@ export function AnalyticsV2({ go }: { go: (path: string) => void }) {
           filtered.length,
       )
     : 0;
+  const omar = customers.find((item) => item.name === "Omar Aziz");
+  const omarCalculation = omar
+    ? demo.dataset.churnCalculations[omar.id]
+    : undefined;
+  const omarOutcome = omar
+    ? [...demo.dataset.outcomes]
+        .reverse()
+        .find((item) => item.customerId === omar.id)
+    : undefined;
   const insights = [
     [
-      "Successful recovery · Omar Aziz",
-      "Observed data",
-      "Risk recalculated to Medium · 42",
-      "Estimated recovered revenue: RM 4,200",
-      "Recovered customer",
-      "View recorded outcome",
-      "High",
+      `${omarOutcome ? "Successful recovery" : "Recovery monitoring"} · Omar Aziz`,
+      omarOutcome ? "Observed data" : "Calculated state",
+      `Risk recalculated to ${omar?.risk ?? "Unavailable"} · ${omar?.riskScore ?? 0}`,
+      omarOutcome
+        ? `${omarOutcome.type} recorded · score change ${omarCalculation?.scoreChange ?? 0}`
+        : "No new outcome recorded in this session",
+      omarOutcome ? "Recovered customer" : "Monitored customer",
+      omarOutcome ? "View recorded outcome" : "Open retention action",
+      omarCalculation?.confidence && omarCalculation.confidence >= 80
+        ? "High"
+        : "Medium",
     ],
     [
       "Most important positive change",

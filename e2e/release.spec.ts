@@ -348,12 +348,10 @@ test("25 Scenario B keeps a grounded Growth draft", async ({ page }) => {
 test("26 Scenario D reports observed successful recovery", async ({ page }) => {
   await clean(page, "/analytics", "Auditor");
   await expect(
-    page.getByRole("heading", { name: "Successful recovery · Omar Aziz" }),
+    page.getByRole("heading", { name: "Recovery monitoring · Omar Aziz" }),
   ).toBeVisible();
+  await expect(page.getByText(/Risk recalculated to High · 68/)).toBeVisible();
   await expect(
-    page.getByText(/Risk recalculated to Medium · 42/),
-  ).toBeVisible();
-  await expect(
-    page.getByText(/Estimated recovered revenue: RM 4,200/),
+    page.getByText(/No new outcome recorded in this session/),
   ).toBeVisible();
 });

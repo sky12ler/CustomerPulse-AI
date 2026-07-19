@@ -146,6 +146,19 @@ test("Production acceptance B — Maya analysis through recorded outcome and aud
     "Outcome recorded and risk recalculated",
   ])
     await expect(page.getByText(event, { exact: false }).first()).toBeVisible();
+  for (const transition of [
+    "Draft -> Pending Approval",
+    "Pending Approval -> Changes Requested",
+    "Changes Requested -> Draft Revision",
+    "Pending Approval -> Approved and Ready",
+    "Approved and Ready -> In Progress",
+    "In Progress -> Waiting for Customer",
+    "Waiting for Customer -> Outcome Required",
+    "Outcome Required -> Completed; Score",
+  ])
+    await expect(
+      page.getByText(transition, { exact: false }).first(),
+    ).toBeVisible();
 });
 
 async function finishCampaign(page: Page) {
@@ -261,18 +274,40 @@ test("Production acceptance D — navigation explanations, next actions, mobile 
   await expect(page.locator(".workflow-steps")).toBeVisible();
 });
 
-test("Production acceptance E — Omar recovery recalculates risk and resolves or downgrades alert", async ({
+test("Production acceptance E - Omar dynamic recovery, metrics, analytics and reset", async ({
   page,
 }) => {
-  await reset(page, "/actions?actionId=ACT-024", "Administrator");
+  await reset(page, "/customers", "Administrator");
+  const initialHigh = await page
+    .getByRole("button", { name: "High/Critical Risk" })
+    .textContent();
+  const initialRevenue = await page.locator(".customer-summary-metric").textContent();
+  await page.getByLabel("Search customer or company").fill("Omar Aziz");
+  const initialOmar = page.locator("tr.customer-operational-row", {
+    hasText: "Omar Aziz",
+  });
+  await expect(initialOmar).toContainText("High alert");
+  const initialScore = await initialOmar
+    .locator("td")
+    .nth(2)
+    .locator("strong")
+    .innerText();
+
+  await page.getByRole("link", { name: "Retention Actions" }).click();
   await page.locator("#ACT-024").click();
-  const initialRisk = await page.locator("#ACT-024 td").nth(1).innerText();
   await page.getByRole("button", { name: "Start Action" }).click();
+  await expect(page.locator(".action-detail")).toContainText("In Progress");
   await page.getByRole("button", { name: "Confirm Execution" }).click();
+  await expect(page.locator(".action-detail")).toContainText(
+    "Waiting for Customer",
+  );
   await page
     .getByLabel("Customer response")
     .fill("The replacement arrived and our next purchase is confirmed");
   await page.getByRole("button", { name: "Record Response" }).click();
+  await expect(page.locator(".action-detail")).toContainText(
+    "Outcome Required",
+  );
   await page.getByLabel("Action outcome").selectOption("Purchase completed");
   await page
     .getByLabel("Outcome notes")
@@ -282,16 +317,65 @@ test("Production acceptance E — Omar recovery recalculates risk and resolves o
   await page
     .getByRole("button", { name: /Record Outcome and Recalculate Risk/ })
     .click();
+  await expect(page.locator(".action-detail")).toContainText("Completed");
+
   await page.getByRole("link", { name: "Customers" }).click();
-  const omar = page.locator("tr", { hasText: "Omar Aziz" });
-  await expect(omar).toBeVisible();
-  await expect(omar).not.toContainText(initialRisk);
-  await omar.click();
+  const updatedHigh = await page
+    .getByRole("button", { name: "High/Critical Risk" })
+    .innerText();
+  const updatedRevenue = await page
+    .locator(".customer-summary-metric")
+    .innerText();
+  expect(updatedHigh !== initialHigh || updatedRevenue !== initialRevenue).toBe(
+    true,
+  );
+  await page.getByLabel("Search customer or company").fill("Omar Aziz");
+  const updatedOmar = page.locator("tr.customer-operational-row", {
+    hasText: "Omar Aziz",
+  });
+  const updatedScore = await updatedOmar
+    .locator("td")
+    .nth(2)
+    .locator("strong")
+    .innerText();
+  expect(updatedScore).not.toBe(initialScore);
+  await updatedOmar.click();
   await expect(
     page.getByText("Monitored", { exact: true }).first(),
   ).toBeVisible();
+
   await page.getByRole("link", { name: "Audit Reports" }).click();
-  await expect(page.getByText(/Score \d+ -> \d+/).first()).toBeVisible();
+  await expect(
+    page.getByText(/Outcome Required -> Completed; Score \d+ -> \d+/).first(),
+  ).toBeVisible();
   await page.getByRole("link", { name: "Analytics" }).click();
-  await expect(page.getByText("Successful recovery · Omar Aziz")).toBeVisible();
+  const recovery = page.locator("article.evidence", {
+    hasText: /Successful recovery.*Omar Aziz/,
+  });
+  await expect(recovery).toContainText("Purchase completed recorded");
+  await expect(recovery).toContainText(/Risk recalculated to (Low|Medium)/);
+  await expect(
+    page.locator("article.evidence", {
+      hasText: "Most effective retention action",
+    }),
+  ).toContainText("1 positive recorded outcomes");
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Reset Demo Data" }).click();
+  await page.getByRole("link", { name: "Customers" }).click();
+  await expect(
+    page.getByRole("button", { name: "High/Critical Risk" }),
+  ).toHaveText(initialHigh ?? "");
+  await expect(page.locator(".customer-summary-metric")).toHaveText(
+    initialRevenue ?? "",
+  );
+  await page.getByRole("link", { name: "Retention Actions" }).click();
+  await expect(page.locator("#ACT-024")).toContainText("Approved and Ready");
+  await page.getByRole("link", { name: "Analytics" }).click();
+  await expect(
+    page.getByRole("heading", { name: /Recovery monitoring.*Omar Aziz/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("No new outcome recorded in this session"),
+  ).toBeVisible();
 });
