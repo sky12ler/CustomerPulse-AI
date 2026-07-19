@@ -51,3 +51,13 @@ Material operations render an in-page success or error state plus next routes; t
 The application displays the active Demo or Imported Workspace in the header. Customer 360 shows Monitored or Active Alert, the latest authoritative score, last evaluated date, future trigger description, source provenance, and Manual Recalculate.
 
 Retention Actions exposes the next responsible control for each state: Begin Revision, Start Action, Open Approved WhatsApp, Confirm Execution, Record Response, Record No Response, Extend Deadline, Send Approved Follow-up, Escalate, and Record Outcome and Recalculate Risk. Disabled controls explain missing role or required information.
+
+## Phase 2 Customers and Customer 360
+
+List state is encoded in `/customers` query parameters: `q`, `tier`, `risk`, `owner`, `region`, `industry`, `consent`, `alert`, `pending`, `overdue`, `sentiment`, `status`, `sort`, `dir`, `page`, and `size`. Opening a customer carries the complete list URL in `from`; Back to Customers restores it and session scroll restoration returns the user near the prior position.
+
+The operational path is Customers -> `/customers/[customerId]` -> Conversations/AVO Insights/Alerts/Actions. Customer 360 tabs are real URL states and browser Back/Forward remount from the URL. Breadcrumbs identify Customers -> Customer Name, and authorized Previous/Next controls use the current scoped customer collection.
+
+Desktop uses the full operational table; tablet suppresses lower-priority columns; mobile uses accessible customer cards. The explicit customer link is primary. A clickable row remains a convenience target with link semantics, focus styling, Enter/Space handling, and event guards so nested links/buttons do not trigger row navigation.
+
+Account Executive state contains only customers assigned to Aisha Rahman. Owner filters are derived from that scoped collection, direct unassigned URLs are denied without data disclosure, and exports contain only the complete filtered authorized result set. Auditor may inspect Customer 360 but cannot run AVO or perform write actions.

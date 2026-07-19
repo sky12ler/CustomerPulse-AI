@@ -9,6 +9,11 @@ import {
   useState,
 } from "react";
 import { audits } from "@/lib/demo-data";
+import {
+  accessibleCustomers,
+  lookupAccessibleCustomer,
+  accessibleActions,
+} from "@/lib/customer-access";
 import type { ImportResult } from "@/lib/imports";
 import type { Role, Sentiment } from "@/lib/types";
 import {
@@ -48,6 +53,11 @@ interface WorkflowContextValue {
     reason?: string,
   ) => void;
   dataset: DemoWorkflowState["datasets"][WorkspaceKind];
+  accessibleCustomers: ReturnType<typeof accessibleCustomers>;
+  accessibleActions: ReturnType<typeof accessibleActions>;
+  lookupCustomer: (
+    customerId: string,
+  ) => ReturnType<typeof lookupAccessibleCustomer>;
   switchWorkspace: (workspace: WorkspaceKind) => void;
   addImport: (result: ImportResult, type: string) => ImportCommitSummary;
   submitRecommendation: (
@@ -228,6 +238,13 @@ export function DemoWorkflowProvider({
         (item) => item.recommendationId === recommendationId,
       );
       if (!existing) throw new Error("Linked retention action was not found");
+      if (
+        !accessibleCustomers(
+          state.datasets[state.activeWorkspace].customers,
+          state.role,
+        ).some((customer) => customer.id === existing.customerId)
+      )
+        throw new Error("Customer access denied");
       if (existing.status !== "Draft")
         throw new Error(`Recommendation already submitted as ${existing.id}`);
       const at = timestamp();
@@ -567,7 +584,7 @@ export function DemoWorkflowProvider({
             createEvent(
               current,
               "Customer response recorded",
-              response.id,
+              actionId + " / " + item.customerId + " / " + response.id,
               "Outcome Required",
               actionId,
             ),
@@ -647,7 +664,7 @@ export function DemoWorkflowProvider({
             createEvent(
               current,
               "Outcome recorded and risk recalculated",
-              record.id,
+              actionId + " / " + item.customerId + " / " + record.id,
               "Completed",
               "Score " + before + " -> " + after,
             ),
@@ -664,6 +681,15 @@ export function DemoWorkflowProvider({
       customerId: string,
       analysis: Parameters<typeof signalsFromAnalysis>[2],
     ) => {
+      if (
+        state.role === "Auditor" ||
+        lookupAccessibleCustomer(
+          state.datasets[state.activeWorkspace].customers,
+          state.role,
+          customerId,
+        ).status !== "allowed"
+      )
+        throw new Error("Customer AVO access denied");
       let rejected: string[] = [];
       update((current) => {
         const workspace = current.activeWorkspace;
@@ -705,7 +731,7 @@ export function DemoWorkflowProvider({
       });
       return rejected;
     },
-    [createEvent, update],
+    [createEvent, state, update],
   );
 
   const recalculate = useCallback(
@@ -781,6 +807,23 @@ export function DemoWorkflowProvider({
       state,
       hydrated,
       dataset: state.datasets[state.activeWorkspace],
+      accessibleCustomers: accessibleCustomers(
+        state.datasets[state.activeWorkspace].customers,
+        state.role,
+      ),
+      accessibleActions: accessibleActions(
+        state.actions.filter(
+          (action) => action.datasetId === state.activeWorkspace,
+        ),
+        state.datasets[state.activeWorkspace].customers,
+        state.role,
+      ),
+      lookupCustomer: (customerId) =>
+        lookupAccessibleCustomer(
+          state.datasets[state.activeWorkspace].customers,
+          state.role,
+          customerId,
+        ),
       switchWorkspace: (workspace) =>
         update((current) => ({
           ...current,

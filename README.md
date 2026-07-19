@@ -119,8 +119,8 @@ npm audit
 
 Final verification passed:
 
-- **47/47 unit tests** across imports, tier/churn boundaries, AVO safeguards, workflows, scenarios, publisher behavior, mock data, and required Supabase security structure.
-- **30/30 production-browser tests** cover all numbered workflow acceptance cases, Scenarios A–D, persistence, multipart CSV/PDF imports, approval/execution gates, shared calendar records, audit history, guided demos, and mobile navigation.
+- **109/109 unit tests** across imports, tier/churn boundaries, AVO safeguards, workflows, scenarios, publisher behavior, mock data, and required Supabase security structure.
+- **44/44 local production-mode browser tests** cover the Phase 2 customer cases plus all preserved numbered workflow acceptance cases, Scenarios A–D, persistence, multipart CSV/PDF imports, approval/execution gates, shared calendar records, audit history, guided demos, and mobile navigation.
 - **30/30 tests also passed against the public Vercel `workflow-v2` deployment**, including the required customers.csv, conversations.csv, and product-catalogue.pdf uploads.
 - Lint, strict type checking, production build, and dependency audit; the audit reported zero vulnerabilities at verification time.
 
@@ -155,3 +155,15 @@ Authoritative functions are `calculateCustomerTier()`, `calculateChurn()`, `eval
 The complete action lifecycle is Draft -> Pending Approval -> Approved and Ready -> In Progress -> Waiting for Customer or Outcome Required -> Completed. Changes Requested returns through a versioned Draft Revision. Responses and outcomes are separate records; a valid outcome runs the real churn engine and records the before/after score in audit.
 
 Limitations: browser demo state is localStorage-backed and device-local; scheduled background monitoring is future scope; external WhatsApp/email controls are deep links or staff-confirmed demo actions; live OpenAI, Buffer, Supabase, and external messaging were not credential-tested in Phase 1. Multi-file Quick Import is implemented, but ZIP bundle import is not.
+
+## Phase 2 customer operations
+
+The Customers workspace now reads only from the Phase 1 authoritative operational provider. Customer 360 is deep-linkable at `/customers/[customerId]`; tabs use `?tab=overview|transactions|conversations|avo-insights|alerts|actions|campaigns|audit`. Customer-name anchors and explicit View Customer links support new tabs, while row mouse, Enter, and Space activation remain available. Invalid IDs show Not Found; IDs outside the current assignment scope show Access Denied without customer details.
+
+The Account Executive demo account maps to Aisha Rahman and is scoped in the provider, lookup, Customer 360, conversations, alerts, recommendations, retention actions, AVO API, exports, and relevant audit events. Administrator and Sales Manager retain broad demo access. Auditor is read-only. The follow-up Supabase migration `202607190002_customer_assignment_rls.sql` expresses the equivalent organization plus `assigned_profile_id = auth.uid()` policy for customer-domain reads; it remains a deployment artifact until the UI is connected to Supabase.
+
+Customers supports accessible search, 11 compatible filters, active chips, URL restoration, seven sort choices, risk-first default ordering, six filtered summary metrics, 10/25/50 pagination, empty states, full-result scoped CSV export, desktop/tablet layouts, and mobile cards. Query parameters are `q`, `tier`, `risk`, `owner`, `region`, `industry`, `consent`, `alert`, `pending`, `overdue`, `sentiment`, `status`, `sort`, `dir`, `page`, and `size`.
+
+Estimated revenue at risk uses ERAR-v1: eligible forecast revenue for the next 90 days multiplied by normalized churn probability. The list explains the estimate and Customer 360 shows the base, probability, estimate, period, version, calculated time, source, disclaimer, and any reasoned/audited override.
+
+Latest Phase 2 local verification: ESLint and strict TypeScript passed; 12 Vitest files / 109 tests passed; 44/44 Playwright tests passed against an optimized production server; the production build passed; `npm audit --audit-level=low` reported zero vulnerabilities; and the secret scan found only the explicit non-secret test fixture. Public Vercel Phase 2 verification is recorded separately after deployment and is never inferred from these local results.

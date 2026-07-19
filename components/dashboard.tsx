@@ -37,7 +37,12 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { audits, demoAccounts, trendChart } from "@/lib/demo-data";
+import {
+  audits,
+  demoAccounts,
+  recommendations,
+  trendChart,
+} from "@/lib/demo-data";
 import type { AVOAnalysis } from "@/lib/avo";
 import type { Customer, Role } from "@/lib/types";
 import type { ImportResult } from "@/lib/imports";
@@ -46,6 +51,7 @@ import {
   useDemoWorkflow,
 } from "@/components/workflow-context";
 import { WorkflowGuide } from "@/components/workflow-guide";
+import { CustomersList } from "@/components/customers-list";
 import { ActionsV2, RecommendationsV2 } from "@/components/retention-workflow";
 import {
   GuidedWalkthrough,
@@ -282,24 +288,27 @@ function DashboardInner({ initialPage }: { initialPage: string }) {
   );
   const [toast, setToast] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [locationVersion, setLocationVersion] = useState(0);
 
   useEffect(() => {
     const syncRoute = () => {
       const route = window.location.pathname.split("/").filter(Boolean)[0];
       setPage(titles[route] ? route : "overview");
+      setLocationVersion((value) => value + 1);
     };
     window.addEventListener("popstate", syncRoute);
     return () => window.removeEventListener("popstate", syncRoute);
   }, []);
 
   const go = (destination: string) => {
-    const [route] = destination.replace(/^\//, "").split("?");
+    const route = destination.replace(/^\//, "").split(/[/?]/)[0];
     setPage(titles[route] ? route : "overview");
     window.history.pushState(
       {},
       "",
       destination.startsWith("/") ? destination : `/${destination}`,
     );
+    setLocationVersion((value) => value + 1);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const notify = (message: string) => {
@@ -307,11 +316,29 @@ function DashboardInner({ initialPage }: { initialPage: string }) {
     setTimeout(() => setToast(""), 4200);
   };
   const legacyAction = state.actions.find((item) => item.id === "ACT-021");
+  const authorizedCustomerIds = new Set(
+    demo.accessibleCustomers.map((customer) => customer.id),
+  );
+  const authorizedEntityIds = new Set([
+    ...authorizedCustomerIds,
+    ...demo.accessibleActions.map((action) => action.id),
+    ...recommendations
+      .filter((recommendation) =>
+        authorizedCustomerIds.has(recommendation.customerId),
+      )
+      .map((recommendation) => recommendation.id),
+  ]);
+  const scopedEvents =
+    role === "Account Executive"
+      ? state.events.filter((event) =>
+          [...authorizedEntityIds].some((id) => event.entity.includes(id)),
+        )
+      : state.events;
   const workflow: Workflow = {
     actionStatus: legacyAction?.status ?? "Draft",
     campaignStatus: state.campaign.status,
     recommendationStatuses: state.recommendationStatuses,
-    events: state.events,
+    events: scopedEvents,
     imports: state.imports.map((item) => item.result),
     requests: state.requests,
     thresholds: state.thresholds,
@@ -462,7 +489,13 @@ function DashboardInner({ initialPage }: { initialPage: string }) {
                 <span className="demo-label">AVO Demo Analysis available</span>
               </div>
             </div>
-            <Page page={page} go={go} notify={notify} role={role} />
+            <Page
+              page={page}
+              go={go}
+              notify={notify}
+              role={role}
+              locationVersion={locationVersion}
+            />
           </div>
         </main>
         <GuidedWalkthrough page={page} go={go} />
@@ -485,11 +518,13 @@ function Page({
   go,
   notify,
   role,
+  locationVersion,
 }: {
   page: string;
   go: (p: string) => void;
   notify: (m: string) => void;
   role: Role;
+  locationVersion: number;
 }) {
   if (!accessByRole[role].includes(page))
     return (
@@ -514,9 +549,9 @@ function Page({
     case "alerts":
       return <Alerts go={go} notify={notify} />;
     case "customers":
-      return <Customers notify={notify} />;
+      return <Customers key={locationVersion} notify={notify} go={go} />;
     case "conversations":
-      return <Conversations notify={notify} />;
+      return <Conversations notify={notify} go={go} />;
     case "imports":
       return <Imports notify={notify} />;
     case "avo":
@@ -545,16 +580,32 @@ function Page({
 }
 
 function Overview({ go }: { go: (p: string) => void }) {
-  const customers = useDemoWorkflow().dataset.customers;
+  const demo = useDemoWorkflow();
+  const customers = demo.accessibleCustomers;
   const atRisk = customers.filter(
     (c) => c.risk === "High" || c.risk === "Critical",
   );
+
+  const attentionCustomers = [...customers]
+    .sort(
+      (a, b) =>
+        Number(b.scenario === "A") - Number(a.scenario === "A") ||
+        b.riskScore - a.riskScore,
+    )
+    .slice(0, 5);
   return (
     <>
       <WalkthroughLauncher go={go} />
       <div className="grid stats">
         {[
-          ["Customers monitored", "30", "All synthetic records", Users],
+          [
+            "Customers monitored",
+            String(customers.length),
+            demo.state.role === "Account Executive"
+              ? "Assigned records"
+              : "Accessible records",
+            Users,
+          ],
           [
             "High / Critical risk",
             `${atRisk.length}`,
@@ -645,7 +696,7 @@ function Overview({ go }: { go: (p: string) => void }) {
               All customers
             </button>
           </div>
-          <CustomerTable rows={customers.filter((c) => c.alerts).slice(0, 5)} />
+          <CustomerTable rows={attentionCustomers} go={go} />
         </div>
         <div className="card">
           <div className="card-head">
@@ -702,51 +753,108 @@ function Priority({ customer, text }: { customer: Customer; text: string }) {
 }
 function CustomerTable({
   rows,
-  onSelect,
+  go,
 }: {
   rows: Customer[];
-  onSelect?: (c: Customer) => void;
+  go: (path: string) => void;
 }) {
+  const open = (customer: Customer) =>
+    go(
+      "/customers/" +
+        customer.id +
+        "?tab=overview&from=" +
+        encodeURIComponent("/overview"),
+    );
   return (
     <div className="table-wrap">
-      <table className="table">
+      <table className="table overview-customer-table">
         <thead>
           <tr>
             <th>Customer</th>
             <th>Tier</th>
             <th>Risk</th>
             <th>Score</th>
-            <th>Revenue at risk</th>
+            <th>Estimated revenue at risk</th>
             <th>Owner</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((c) => (
+          {rows.map((customer) => (
             <tr
-              key={c.id}
-              onClick={() => onSelect?.(c)}
-              style={{ cursor: onSelect ? "pointer" : "default" }}
+              key={customer.id}
+              role="link"
+              tabIndex={0}
+              aria-label={"Open customer " + customer.name}
+              onClick={(event) => {
+                if (!(event.target as HTMLElement).closest("a,button"))
+                  open(customer);
+              }}
+              onKeyDown={(event) => {
+                if (
+                  (event.key === "Enter" || event.key === " ") &&
+                  !(event.target as HTMLElement).closest("a,button")
+                ) {
+                  event.preventDefault();
+                  open(customer);
+                }
+              }}
             >
               <td>
                 <div className="customer">
                   <div className="customer-dot">
-                    {c.name.slice(0, 2).toUpperCase()}
+                    {customer.name.slice(0, 2).toUpperCase()}
                   </div>
                   <div>
-                    <strong>{c.name}</strong>
-                    <div className="subtle" style={{ fontSize: 9 }}>
-                      {c.company}
-                    </div>
+                    <a
+                      className="customer-name-link"
+                      href={
+                        "/customers/" +
+                        customer.id +
+                        "?tab=overview&from=" +
+                        encodeURIComponent("/overview")
+                      }
+                      onClick={(event) => {
+                        event.preventDefault();
+                        open(customer);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === " ") {
+                          event.preventDefault();
+                          open(customer);
+                        }
+                      }}
+                    >
+                      {customer.name}
+                    </a>
+                    <div className="subtle">{customer.company}</div>
                   </div>
                 </div>
               </td>
-              <td>{badge(c.tier)}</td>
-              <td>{badge(c.risk)}</td>
+              <td>{badge(customer.tier)}</td>
+              <td>{badge(customer.risk)}</td>
               <td>
-                <strong>{c.riskScore}</strong>
+                <strong>{customer.riskScore}</strong>
               </td>
-              <td>{money(c.revenueAtRisk)}</td>
-              <td>{c.staff}</td>
+              <td>{money(customer.revenueAtRisk)}</td>
+              <td>{customer.staff}</td>
+              <td>
+                <a
+                  className="btn btn-outline"
+                  href={
+                    "/customers/" +
+                    customer.id +
+                    "?tab=overview&from=" +
+                    encodeURIComponent("/overview")
+                  }
+                  onClick={(event) => {
+                    event.preventDefault();
+                    open(customer);
+                  }}
+                >
+                  View Customer
+                </a>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -761,7 +869,7 @@ function Alerts({
   go: (p: string) => void;
   notify: (s: string) => void;
 }) {
-  const customers = useDemoWorkflow().dataset.customers;
+  const customers = useDemoWorkflow().accessibleCustomers;
   const [risk, setRisk] = useState("All"),
     [owner, setOwner] = useState("All");
   const rows = customers.filter(
@@ -797,8 +905,11 @@ function Alerts({
             onChange={(e) => setOwner(e.target.value)}
           >
             <option>All</option>
-            <option>Aisha Rahman</option>
-            <option>Daniel Wong</option>
+            {[...new Set(customers.map((customer) => customer.staff))].map(
+              (staff) => (
+                <option key={staff}>{staff}</option>
+              ),
+            )}
           </select>
         </div>
       </div>
@@ -822,7 +933,18 @@ function Alerts({
             {rows.map((c, i) => (
               <tr key={c.id}>
                 <td>
-                  <strong>{c.name}</strong>
+                  <a
+                    className="customer-name-link"
+                    href={`/customers/${c.id}?tab=alerts&from=${encodeURIComponent("/alerts")}`}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      go(
+                        `/customers/${c.id}?tab=alerts&from=${encodeURIComponent("/alerts")}`,
+                      );
+                    }}
+                  >
+                    {c.name}
+                  </a>
                   <div className="subtle">
                     {c.id} · {c.tier}
                   </div>
@@ -841,7 +963,11 @@ function Alerts({
                 <td>
                   <button
                     className="btn btn-outline"
-                    onClick={() => go("conversations")}
+                    onClick={() =>
+                      go(
+                        `/customers/${c.id}?tab=alerts&from=${encodeURIComponent("/alerts")}`,
+                      )
+                    }
                   >
                     Review evidence
                   </button>
@@ -858,88 +984,125 @@ function Alerts({
   );
 }
 
-function Customers({ notify }: { notify: (s: string) => void }) {
-  const { dataset, state } = useDemoWorkflow();
-  const customers = dataset.customers;
-  const [selected, setSelected] = useState<Customer | null>(null);
-  const [query, setQuery] = useState("");
-  const filtered = customers.filter((c) =>
-    (c.name + c.company).toLowerCase().includes(query.toLowerCase()),
-  );
-  const exportRows = () => {
-    const header =
-        "customer_id,customer_name,company,tier,risk,risk_score,revenue_at_risk,owner\n",
-      rows = filtered
-        .map((c) =>
-          [
-            c.id,
-            c.name,
-            c.company,
-            c.tier,
-            c.risk,
-            c.riskScore,
-            c.revenueAtRisk,
-            c.staff,
-          ]
-            .map((v) => `\"${String(v).replaceAll('"', '""')}\"`)
-            .join(","),
-        )
-        .join("\n");
-    downloadText("customerpulse-customers.csv", header + rows, "text/csv");
-    notify(`Exported ${filtered.length} customer records`);
-  };
-  if (selected)
+function Customers({
+  notify,
+  go,
+}: {
+  notify: (s: string) => void;
+  go: (path: string) => void;
+}) {
+  const demo = useDemoWorkflow();
+  const path =
+    typeof window === "undefined" ? "/customers" : window.location.pathname;
+  const customerId = path.split("/").filter(Boolean)[1];
+  if (!customerId) return <CustomersList notify={notify} go={go} />;
+  const access = demo.lookupCustomer(decodeURIComponent(customerId));
+  if (access.status === "not-found")
     return (
-      <Customer360
-        customer={selected}
-        back={() => setSelected(null)}
-        notify={notify}
-      />
-    );
-  return (
-    <div className="card">
-      <div className="card-head">
-        <div className="field" style={{ width: 320 }}>
-          <label>Search customer or company</label>
-          <div style={{ position: "relative" }}>
-            <Search
-              size={14}
-              style={{ position: "absolute", left: 10, top: 11 }}
-            />
-            <input
-              className="input"
-              style={{ paddingLeft: 32 }}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={`Search ${customers.length} ${state.activeWorkspace} workspace customers`}
-            />
-          </div>
-        </div>
-        <button className="btn btn-outline" onClick={exportRows}>
-          Export view <Download size={14} />
+      <section className="card empty" role="status">
+        <Search size={34} />
+        <h2>Customer Not Found</h2>
+        <p>
+          No customer exists for the supplied customer ID in this workspace.
+        </p>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() => go("/customers")}
+        >
+          Back to Customers
         </button>
-      </div>
-      <CustomerTable rows={filtered} onSelect={setSelected} />
-    </div>
+      </section>
+    );
+  if (access.status === "denied")
+    return (
+      <section className="card empty" role="alert">
+        <ShieldCheck size={34} />
+        <h2>Access Denied</h2>
+        <p>
+          This customer is outside your assigned customer scope. No customer
+          information has been disclosed.
+        </p>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() => go("/customers")}
+        >
+          Back to assigned Customers
+        </button>
+      </section>
+    );
+  const params = new URLSearchParams(window.location.search);
+  const from = params.get("from") || "/customers";
+  const list = demo.accessibleCustomers;
+  const index = list.findIndex(
+    (customer) => customer.id === access.customer.id,
+  );
+  return (
+    <Customer360
+      customer={access.customer}
+      back={() => go(from)}
+      go={go}
+      returnTo={from}
+      previous={index > 0 ? list[index - 1] : undefined}
+      next={index >= 0 && index < list.length - 1 ? list[index + 1] : undefined}
+      notify={notify}
+    />
   );
 }
 
 function Customer360({
   customer: initialCustomer,
   back,
+  go,
+  returnTo,
+  previous,
+  next,
   notify,
 }: {
   customer: Customer;
   back: () => void;
+  go: (path: string) => void;
+  returnTo: string;
+  previous?: Customer;
+  next?: Customer;
   notify: (s: string) => void;
 }) {
-  const [tab, setTab] = useState("Overview"),
+  const tabSlugs: Record<string, string> = {
+    Overview: "overview",
+    Transactions: "transactions",
+    Conversations: "conversations",
+    "AVO Insights": "avo-insights",
+    Alerts: "alerts",
+    Actions: "actions",
+    "Campaign History": "campaigns",
+    "Audit History": "audit",
+  };
+  const slugTabs = Object.fromEntries(
+    Object.entries(tabSlugs).map(([label, slug]) => [slug, label]),
+  );
+  const requestedTab =
+    new URLSearchParams(
+      typeof window === "undefined" ? "" : window.location.search,
+    ).get("tab") ?? "overview";
+  const [tab, setTab] = useState(slugTabs[requestedTab] ?? "Overview"),
     [analysis, setAnalysis] = useState<AVOAnalysis | null>(null),
     [loading, setLoading] = useState(false);
   const demo = useDemoWorkflow();
+  const openTab = (label: string) => {
+    setTab(label);
+    window.history.pushState(
+      {},
+      "",
+      `/customers/${initialCustomer.id}?tab=${tabSlugs[label]}&from=${encodeURIComponent(returnTo)}`,
+    );
+  };
+  const customerLink = (customer: Customer) =>
+    `/customers/${customer.id}?tab=overview&from=${encodeURIComponent(returnTo)}`;
   const c =
     demo.dataset.customers.find((item) => item.id === initialCustomer.id) ??
     initialCustomer;
+  const churnCalculation = demo.dataset.churnCalculations[c.id];
   const workflow = useWorkflow();
   const run = async () => {
     setLoading(true);
@@ -947,7 +1110,11 @@ function Customer360({
       const r = await fetch("/api/avo/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ customerId: c.id, customer: c }),
+          body: JSON.stringify({
+            customerId: c.id,
+            customer: c,
+            role: demo.state.role,
+          }),
         }),
         data = await r.json();
       if (!r.ok) throw new Error(data.error);
@@ -955,7 +1122,7 @@ function Customer360({
       const rejected = demo.storeAnalysis(c.id, data.analysis);
       if (rejected.length)
         throw new Error(`Invalid evidence IDs: ${rejected.join(", ")}`);
-      setTab("AVO Insights");
+      openTab("AVO Insights");
       workflow.log(
         "Conversation analysis",
         c.id,
@@ -1003,6 +1170,63 @@ function Customer360({
               diversity and relationship · tier-v1.0
             </div>
           </div>
+          <div className="evidence revenue-breakdown">
+            <strong>Estimated revenue at risk</strong>
+            <dl>
+              <div>
+                <dt>Eligible revenue base</dt>
+                <dd>{money(churnCalculation?.eligibleRevenueBase ?? 0)}</dd>
+              </div>
+              <div>
+                <dt>Churn probability</dt>
+                <dd>
+                  {Math.round(
+                    (churnCalculation?.churnProbability ?? c.riskScore / 100) *
+                      100,
+                  )}
+                  %
+                </dd>
+              </div>
+              <div>
+                <dt>Estimated revenue at risk</dt>
+                <dd>{money(c.revenueAtRisk)}</dd>
+              </div>
+              <div>
+                <dt>Period</dt>
+                <dd>{churnCalculation?.revenuePeriod ?? "Next 90 days"}</dd>
+              </div>
+              <div>
+                <dt>Calculation</dt>
+                <dd>
+                  {churnCalculation?.revenueCalculationVersion ?? "ERAR-v1"}
+                </dd>
+              </div>
+              <div>
+                <dt>Calculated</dt>
+                <dd>
+                  {churnCalculation?.calculatedAt
+                    ? new Date(churnCalculation.calculatedAt).toLocaleString()
+                    : "Not calculated"}
+                </dd>
+              </div>
+              <div>
+                <dt>Data source</dt>
+                <dd>{churnCalculation?.revenueDataSource ?? "Unavailable"}</dd>
+              </div>
+            </dl>
+            <p className="subtle">
+              Estimated revenue at risk is the eligible forecast revenue for the
+              selected period multiplied by the customer&apos;s normalized churn
+              probability. It is an estimate, not a guaranteed loss.
+            </p>
+            {churnCalculation?.revenueOverride && (
+              <div className="notice warning">
+                Override: {money(churnCalculation.revenueOverride.value)} ·{" "}
+                {churnCalculation.revenueOverride.reason} ·{" "}
+                {churnCalculation.revenueOverride.user}
+              </div>
+            )}
+          </div>
           <div className="evidence">
             <strong>Product history</strong>
             <div className="subtle">{c.products.join(" · ")}</div>
@@ -1028,26 +1252,26 @@ function Customer360({
         <table className="table">
           <thead>
             <tr>
-              <th>Source</th>
+              <th>Transaction</th>
               <th>Date</th>
               <th>Product</th>
               <th>Amount</th>
-              <th>Trend</th>
+              <th>Source</th>
             </tr>
           </thead>
           <tbody>
-            {c.products.map((p, i) => (
-              <tr key={p}>
-                <td>
-                  TXN-{c.id.slice(-2)}
-                  {i + 1}
-                </td>
-                <td>{c.lastPurchase}</td>
-                <td>{p}</td>
-                <td>{money(Math.round(c.ltv / (i + 3)))}</td>
-                <td>{c.spendTrend}%</td>
-              </tr>
-            ))}
+            {demo.dataset.transactions
+              .filter((transaction) => transaction.customerId === c.id)
+              .sort((a, b) => b.date.localeCompare(a.date))
+              .map((transaction) => (
+                <tr key={transaction.id}>
+                  <td>{transaction.id}</td>
+                  <td>{transaction.date}</td>
+                  <td>{transaction.productName}</td>
+                  <td>{money(transaction.amount)}</td>
+                  <td>{transaction.sourceType}</td>
+                </tr>
+              ))}
           </tbody>
         </table>
       </div>
@@ -1065,43 +1289,96 @@ function Customer360({
         ))}
       </div>
     );
-  else if (tab === "AVO Insights")
+  else if (tab === "AVO Insights") {
+    const storedAnalysis = demo.dataset.analyses.find(
+      (item) => item.customerId === c.id,
+    );
     body = analysis ? (
       <AnalysisPanel analysis={analysis} notify={notify} />
+    ) : storedAnalysis ? (
+      <div>
+        <div className="notice">Stored validated AVO analysis</div>
+        <div className="evidence">
+          <span className="evidence-id">
+            {storedAnalysis.id} - {storedAnalysis.confidence}% confidence
+          </span>
+          <p>{storedAnalysis.summary}</p>
+          <div>
+            Evidence:{" "}
+            {storedAnalysis.evidenceIds.join(", ") ||
+              "No eligible evidence IDs"}
+          </div>
+        </div>
+        <button
+          className="btn btn-primary"
+          onClick={run}
+          disabled={demo.state.role === "Auditor"}
+        >
+          Run AVO Analysis Again
+        </button>
+      </div>
     ) : (
       <div className="empty">
         <Bot size={30} />
-        <p>No analysis recorded in this session.</p>
-        <button className="btn btn-primary" onClick={run}>
+        <p>No analysis has been recorded for this customer.</p>
+        <button
+          className="btn btn-primary"
+          onClick={run}
+          disabled={demo.state.role === "Auditor"}
+        >
           Run AVO Analysis
         </button>
       </div>
     );
-  else if (tab === "Alerts")
-    body = (
-      <div className="evidence">
-        <span className="evidence-id">ALT-{c.id.slice(-4)}</span>
-        <div>
-          {c.alerts
-            ? `${c.risk} risk · ${c.riskScore}/100 · ${c.scenario === "A" ? "Cancellation language and missed follow-up" : "Threshold alert"}`
-            : "No open alerts"}
-        </div>
-      </div>
+  } else if (tab === "Alerts") {
+    const alerts = demo.dataset.alerts.filter(
+      (alert) => alert.customerId === c.id,
     );
-  else if (tab === "Actions")
-    body = (
-      <div className="evidence">
-        <span className="evidence-id">ACT-{c.id.slice(-3)}</span>
-        <div>
-          {c.scenario === "A"
-            ? `Service recovery · ${workflow.actionStatus}`
-            : c.scenario === "D"
-              ? "Recovery completed · positive response recorded"
-              : "No active retention action"}
-        </div>
+    body = alerts.length ? (
+      <div>
+        {alerts.map((alert) => (
+          <div className="evidence" key={alert.id}>
+            <span className="evidence-id">
+              {alert.id} - {alert.status}
+            </span>
+            <div>
+              {alert.trigger} - {alert.currentRisk} - updated{" "}
+              {new Date(alert.updatedAt).toLocaleString()}
+            </div>
+            <div>
+              Evidence: {alert.evidence.join(", ") || "No evidence references"}
+            </div>
+          </div>
+        ))}
       </div>
+    ) : (
+      <div className="empty">No customer alerts are recorded.</div>
     );
-  else if (tab === "Campaign History")
+  } else if (tab === "Actions") {
+    const actions = demo.accessibleActions.filter(
+      (action) => action.customerId === c.id,
+    );
+    body = actions.length ? (
+      <div>
+        {actions.map((action) => (
+          <div className="evidence" key={action.id}>
+            <span className="evidence-id">
+              {action.id} - {action.status}
+            </span>
+            <div>{action.recommendation}</div>
+            <button
+              className="btn btn-outline"
+              onClick={() => go("/actions?actionId=" + action.id)}
+            >
+              View Retention Action
+            </button>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div className="empty">No active retention action.</div>
+    );
+  } else if (tab === "Campaign History")
     body = (
       <div className="evidence">
         <span className="evidence-id">CAM-DEMO</span>
@@ -1138,9 +1415,34 @@ function Customer360({
     );
   return (
     <>
-      <button className="btn btn-outline" onClick={back}>
-        ← Back to customers
-      </button>
+      <nav className="customer-breadcrumbs" aria-label="Breadcrumb">
+        <button type="button" className="text-button" onClick={back}>
+          Customers
+        </button>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">{c.name}</span>
+      </nav>
+      <div className="customer-detail-navigation">
+        <button className="btn btn-outline" onClick={back}>
+          Back to Customers
+        </button>
+        {previous && (
+          <button
+            className="btn btn-outline"
+            onClick={() => go(customerLink(previous))}
+          >
+            Previous Customer
+          </button>
+        )}
+        {next && (
+          <button
+            className="btn btn-outline"
+            onClick={() => go(customerLink(next))}
+          >
+            Next Customer
+          </button>
+        )}
+      </div>
       <div className="card" style={{ marginTop: 12 }}>
         <div className="split">
           <div className="customer">
@@ -1175,7 +1477,10 @@ function Customer360({
             <button
               className="btn btn-primary"
               onClick={run}
-              disabled={loading}
+              disabled={loading || demo.state.role === "Auditor"}
+              title={
+                demo.state.role === "Auditor" ? "Auditor is read-only" : ""
+              }
             >
               <Bot size={14} />
               {loading ? "Analysing…" : "Run AVO Analysis"}
@@ -1198,7 +1503,7 @@ function Customer360({
           </div>
           <div className="kpi">
             <strong>{money(c.revenueAtRisk)}</strong>
-            <span>revenue at risk</span>
+            <span>estimated revenue at risk</span>
           </div>
           <div className="kpi">
             <strong>
@@ -1219,18 +1524,23 @@ function Customer360({
         </div>
       </div>
       <div className="card" style={{ marginTop: 14 }}>
-        <div className="tabs">
+        <div className="tabs" role="tablist" aria-label="Customer sections">
           {tabs.map((t) => (
             <button
               key={t}
-              onClick={() => setTab(t)}
+              role="tab"
+              aria-selected={tab === t}
+              aria-controls="customer-tab-panel"
+              onClick={() => openTab(t)}
               className={`tab ${tab === t ? "active" : ""}`}
             >
               {t}
             </button>
           ))}
         </div>
-        {body}
+        <div id="customer-tab-panel" role="tabpanel">
+          {body}
+        </div>
       </div>
     </>
   );
@@ -1267,9 +1577,15 @@ function RiskFactors({ c }: { c: Customer }) {
   );
 }
 
-function Conversations({ notify }: { notify: (s: string) => void }) {
+function Conversations({
+  notify,
+  go,
+}: {
+  notify: (s: string) => void;
+  go: (path: string) => void;
+}) {
   const demo = useDemoWorkflow();
-  const customers = demo.dataset.customers;
+  const customers = demo.accessibleCustomers;
   const eligible = customers.filter((c) => c.messages.length);
   const [selected, setSelected] = useState(eligible[0]),
     [query, setQuery] = useState(""),
@@ -1296,7 +1612,11 @@ function Conversations({ notify }: { notify: (s: string) => void }) {
       const r = await fetch("/api/avo/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerId: selected.id, customer: selected }),
+        body: JSON.stringify({
+          customerId: selected.id,
+          customer: selected,
+          role: demo.state.role,
+        }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error);
@@ -1374,8 +1694,11 @@ function Conversations({ notify }: { notify: (s: string) => void }) {
             onChange={(e) => setOwner(e.target.value)}
           >
             <option>All</option>
-            <option>Aisha Rahman</option>
-            <option>Daniel Wong</option>
+            {[...new Set(customers.map((customer) => customer.staff))].map(
+              (staff) => (
+                <option key={staff}>{staff}</option>
+              ),
+            )}
           </select>
         </div>
         <div className="conversation-list">
@@ -1416,10 +1739,31 @@ function Conversations({ notify }: { notify: (s: string) => void }) {
               {selected.company} · {selected.preferredChannel}
             </div>
           </div>
-          <button className="btn btn-primary" onClick={run} disabled={loading}>
-            <Bot size={14} />
-            {loading ? "Analysing…" : "Run AVO Analysis"}
-          </button>
+          <div className="top-actions">
+            <a
+              className="btn btn-outline"
+              href={`/customers/${selected.id}?tab=conversations&from=${encodeURIComponent("/conversations")}`}
+              onClick={(event) => {
+                event.preventDefault();
+                go(
+                  `/customers/${selected.id}?tab=conversations&from=${encodeURIComponent("/conversations")}`,
+                );
+              }}
+            >
+              View Customer
+            </a>
+            <button
+              className="btn btn-primary"
+              onClick={run}
+              disabled={loading || demo.state.role === "Auditor"}
+              title={
+                demo.state.role === "Auditor" ? "Auditor is read-only" : ""
+              }
+            >
+              <Bot size={14} />
+              {loading ? "Analysing…" : "Run AVO Analysis"}
+            </button>
+          </div>
         </div>
         <div className="messages">
           {selected.messages.map((m) => (

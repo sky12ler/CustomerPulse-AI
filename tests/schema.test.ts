@@ -10,6 +10,14 @@ const sql = readFileSync(
   "utf8",
 ).toLowerCase();
 
+const phase2Sql = readFileSync(
+  path.join(
+    process.cwd(),
+    "supabase/migrations/202607190002_customer_assignment_rls.sql",
+  ),
+  "utf8",
+).toLowerCase();
+
 const requiredTables = [
   "organizations",
   "profiles",
@@ -76,5 +84,18 @@ describe("Supabase security migration", () => {
       "check(approver_id is null or approver_id<>requester_id)",
     );
     expect(sql).toContain("unique(organization_id,idempotency_key)");
+  });
+
+  it("enforces Account Executive assignment scope and persists ERAR-v1 fields", () => {
+    expect(phase2Sql).toContain("assigned_profile_id = auth.uid()");
+    expect(phase2Sql).toContain("can_access_customer");
+    expect(phase2Sql).toContain("drop policy if exists customer_ops");
+    expect(phase2Sql).toContain("messages_assignment_read");
+    expect(phase2Sql).toContain("audit_customer_scope_read");
+    expect(phase2Sql).toContain("eligible_revenue_base");
+    expect(phase2Sql).toContain("revenue_calculation_version");
+    expect(phase2Sql).not.toMatch(
+      /on public\.audit_logs\s+for (update|delete)/,
+    );
   });
 });

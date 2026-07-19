@@ -52,3 +52,21 @@ Passed locally on 2026-07-19:
 - Credential-free demo requires no upload.
 
 Not part of the verified Phase 1 acceptance: background scheduling, ZIP bundle import, or credentialed external providers.
+
+## Phase 2 customer acceptance
+
+| Criterion                        | Verified evidence                                                                                 | Status                                      |
+| -------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| Deep links and refresh           | `/customers/[customerId]`, URL tab state, Not Found/Access Denied, refresh tests                  | Local browser verified                      |
+| Semantic and keyboard navigation | Name anchors, View Customer, row mouse/Enter/Space, focus styles, Overview link                   | Local browser verified                      |
+| Account Executive assignment     | Aisha-only provider/lookup/routes/conversations/alerts/recommendations/actions/AVO/export/audit   | Unit + local browser verified               |
+| Search/filter URL state          | Explicit search label/clear/Escape, dynamic counts, 11 filters, chips, encoded query state        | Local browser verified                      |
+| Sorting and priority             | Seven accessible sortable fields, `aria-sort`, Critical-to-Low default ordering                   | Unit + local browser verified               |
+| Summary and pagination           | Six filtered/scoped metrics, quick filters, 10/25/50, range/page/empty state                      | Local browser verified                      |
+| ERAR-v1                          | 90-day base x normalized churn probability; all seeds and Maya consistency; override reason/audit | Unit + local browser verified               |
+| Operational table/export         | alerts/actions/deadlines/status detail; complete filtered/sorted scoped CSV with metadata         | Local browser verified                      |
+| Responsive/accessibility         | desktop table, tablet column reduction, mobile cards, labels/text/focus, no page overflow         | Local browser verified                      |
+| Supabase assignment design       | follow-up migration removes permissive customer reads and adds assignment-aware policies          | Static unit verified; not remotely deployed |
+| Quality gates                    | lint, TypeScript, 109 unit, 44 Playwright, build, audit, secret scan                              | Local passed                                |
+
+No Phase 2 production result is claimed until the public Vercel deployment is tested directly.

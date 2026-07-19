@@ -63,7 +63,14 @@ export interface ChurnCalculation extends Provenance {
   components: ChurnComponent[];
   topFactors: string[];
   evidence: string[];
+  eligibleRevenueBase: number;
+  revenuePeriod: "Next 90 days";
+  churnProbability: number;
   estimatedRevenueAtRisk: number;
+  revenueCalculationVersion: "ERAR-v1";
+  revenueDataSource: string;
+  estimateDisclaimer: string;
+  revenueOverride?: { value: number; reason: string; user: string; at: string };
   triggerType: string;
   previousScore: number;
   scoreChange: number;
@@ -362,10 +369,24 @@ export function calculateChurn(
     98,
     55 + Math.min(25, tx.length * 3) + (customer.messages.length ? 15 : 0),
   );
-  const revenue = Math.max(
-    customer.ltv,
-    tx.reduce((sum, item) => sum + item.amount, 0),
+  const transactionTotal = tx.reduce((sum, item) => sum + item.amount, 0);
+  const firstTransaction = tx[0]?.date;
+  const lastTransaction = tx.at(-1)?.date;
+  const observedDays =
+    firstTransaction && lastTransaction
+      ? Math.max(
+          90,
+          Math.ceil(
+            (new Date(lastTransaction).getTime() -
+              new Date(firstTransaction).getTime()) /
+              86400000,
+          ) + 1,
+        )
+      : 90;
+  const eligibleRevenueBase = Math.round(
+    (transactionTotal / observedDays) * 90,
   );
+  const churnProbability = score / 100;
   return {
     ...source(dataset.id, "System Calculation", customerId),
     customerId,
@@ -378,12 +399,69 @@ export function calculateChurn(
       .slice(0, 3)
       .map((item) => item.name),
     evidence: components.flatMap((item) => item.evidence),
-    estimatedRevenueAtRisk: Math.round((revenue * score) / 100),
+    eligibleRevenueBase,
+    revenuePeriod: "Next 90 days",
+    churnProbability,
+    estimatedRevenueAtRisk: Math.round(eligibleRevenueBase * churnProbability),
+    revenueCalculationVersion: "ERAR-v1",
+    revenueDataSource: tx.length
+      ? "Observed transaction run-rate"
+      : "No eligible transaction forecast",
+    estimateDisclaimer: "Estimate, not a guaranteed loss.",
     calculationVersion: VERSION,
     triggerType,
     previousScore,
     scoreChange: score - previousScore,
     calculatedAt: now(),
+  };
+}
+
+export function applyRevenueAtRiskOverride(
+  dataset: OperationalDataset,
+  customerId: string,
+  value: number,
+  reason: string,
+  user: string,
+) {
+  if (!reason.trim())
+    throw new Error("Revenue-at-risk override reason is required");
+  if (!Number.isFinite(value) || value < 0)
+    throw new Error("Revenue-at-risk override must be a non-negative number");
+  const calculation = dataset.churnCalculations[customerId];
+  if (!calculation) throw new Error("Customer churn calculation not found");
+  const at = now();
+  const updated = {
+    ...calculation,
+    estimatedRevenueAtRisk: Math.round(value),
+    revenueOverride: {
+      value: Math.round(value),
+      reason: reason.trim(),
+      user,
+      at,
+    },
+  };
+  return {
+    dataset: {
+      ...dataset,
+      churnCalculations: {
+        ...dataset.churnCalculations,
+        [customerId]: updated,
+      },
+      customers: dataset.customers.map((customer) =>
+        customer.id === customerId
+          ? { ...customer, revenueAtRisk: updated.estimatedRevenueAtRisk }
+          : customer,
+      ),
+    },
+    audit: {
+      action: "Estimated revenue at risk overridden",
+      customerId,
+      before: calculation.estimatedRevenueAtRisk,
+      after: updated.estimatedRevenueAtRisk,
+      reason: reason.trim(),
+      user,
+      at,
+    },
   };
 }
 export function evaluateCustomerAlerts(

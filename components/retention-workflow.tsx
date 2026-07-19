@@ -33,6 +33,12 @@ export function RecommendationsV2({
   go: (s: string) => void;
 }) {
   const demo = useDemoWorkflow();
+  const accessibleIds = new Set(
+    demo.accessibleCustomers.map((customer) => customer.id),
+  );
+  const accessibleRecommendations = recommendations.filter((item) =>
+    accessibleIds.has(item.customerId),
+  );
   const [selected, setSelected] = useState(
     () =>
       new URLSearchParams(
@@ -65,9 +71,9 @@ export function RecommendationsV2({
             <h2>Recommendation queue</h2>
             <span className="badge medium">Human review required</span>
           </div>
-          {recommendations.map((item) => {
+          {accessibleRecommendations.map((item) => {
             const customer =
-              demo.dataset.customers.find((c) => c.id === item.customerId) ??
+              demo.accessibleCustomers.find((c) => c.id === item.customerId) ??
               customers.find((c) => c.id === item.customerId)!;
             const status =
               demo.state.recommendationStatuses[item.id] ?? item.status;
@@ -90,7 +96,10 @@ export function RecommendationsV2({
         </section>
         <RecommendationDetail
           key={selected}
-          rec={recommendations.find((item) => item.id === selected)!}
+          rec={
+            (accessibleRecommendations.find((item) => item.id === selected) ??
+              accessibleRecommendations[0])!
+          }
           notify={notify}
           go={go}
         />
@@ -110,7 +119,7 @@ function RecommendationDetail({
 }) {
   const demo = useDemoWorkflow();
   const customer =
-    demo.dataset.customers.find((item) => item.id === rec.customerId) ??
+    demo.accessibleCustomers.find((item) => item.id === rec.customerId) ??
     customers.find((item) => item.id === rec.customerId)!;
   const [draft, setDraft] = useState(
     customer.scenario === "A"
@@ -244,7 +253,11 @@ function RecommendationDetail({
         </button>
         <button
           className="btn btn-outline"
-          onClick={() => go(`customers?customerId=${customer.id}`)}
+          onClick={() =>
+            go(
+              `/customers/${customer.id}?tab=overview&from=${encodeURIComponent("/recommendations")}`,
+            )
+          }
         >
           View Customer
         </button>
@@ -298,7 +311,7 @@ export function ActionsV2({
     typeof window === "undefined" ? "" : window.location.search,
   ).get("actionId");
   const [selected, setSelected] = useState(
-    queryId ?? demo.state.actions[0]?.id,
+    queryId ?? demo.accessibleActions[0]?.id,
   );
   const [tab, setTab] = useState("All");
   const [search, setSearch] = useState("");
@@ -311,23 +324,26 @@ export function ActionsV2({
   const manager = role === "Sales Manager" || role === "Administrator";
   const executor = role === "Account Executive" || role === "Administrator";
   const counts = {
-    pending: demo.state.actions.filter((a) => a.status === "Pending Approval")
+    pending: demo.accessibleActions.filter(
+      (a) => a.status === "Pending Approval",
+    ).length,
+    changes: demo.accessibleActions.filter(
+      (a) => a.status === "Changes Requested",
+    ).length,
+    ready: demo.accessibleActions.filter(
+      (a) => a.status === "Approved and Ready",
+    ).length,
+    progress: demo.accessibleActions.filter((a) => a.status === "In Progress")
       .length,
-    changes: demo.state.actions.filter((a) => a.status === "Changes Requested")
-      .length,
-    ready: demo.state.actions.filter((a) => a.status === "Approved and Ready")
-      .length,
-    progress: demo.state.actions.filter((a) => a.status === "In Progress")
-      .length,
-    overdue: demo.state.actions.filter(
+    overdue: demo.accessibleActions.filter(
       (a) =>
         new Date(a.deadline) < new Date() &&
         !["Completed", "Rejected"].includes(a.status),
     ).length,
-    completed: demo.state.actions.filter((a) => a.status === "Completed")
+    completed: demo.accessibleActions.filter((a) => a.status === "Completed")
       .length,
   };
-  const visible = demo.state.actions.filter(
+  const visible = demo.accessibleActions.filter(
     (item) =>
       item.datasetId === demo.state.activeWorkspace &&
       (tab === "All" ||
@@ -338,7 +354,7 @@ export function ActionsV2({
         .includes(search.toLowerCase()),
   );
   const action =
-    demo.state.actions.find(
+    demo.accessibleActions.find(
       (item) =>
         item.id === selected && item.datasetId === demo.state.activeWorkspace,
     ) ?? visible[0];
@@ -370,7 +386,7 @@ export function ActionsV2({
   const execute = () => {
     setError("");
     try {
-      const customer = demo.dataset.customers.find(
+      const customer = demo.accessibleCustomers.find(
         (c) => c.id === action.customerId,
       );
       if (!customer || !canOutreach(customer, "WhatsApp"))
@@ -663,7 +679,11 @@ function ActionDetail(props: ActionDetailProps) {
           ))}
           <button
             className="btn btn-outline"
-            onClick={() => go(`customers?customerId=${action.customerId}`)}
+            onClick={() =>
+              go(
+                `/customers/${action.customerId}?tab=actions&from=${encodeURIComponent("/actions")}`,
+              )
+            }
           >
             View Customer
           </button>{" "}
@@ -858,8 +878,8 @@ function ActionDetail(props: ActionDetailProps) {
               <div className="evidence">
                 <b>Waiting for Customer</b>
                 <br />
-                Executed {action.executedAt} � Response deadline{" "}
-                {action.responseDeadline} � Follow-up owner {action.owner}
+                Executed {action.executedAt} - Response deadline{" "}
+                {action.responseDeadline} - Follow-up owner {action.owner}
               </div>
               <label className="field">
                 Customer response

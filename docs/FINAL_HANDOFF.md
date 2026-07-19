@@ -120,3 +120,11 @@ Local verification on 2026-07-19: ESLint passed; TypeScript passed; 94/94 unit t
 External limitations: no credentialed OpenAI, Buffer, Supabase, WhatsApp, or email provider was exercised. Demo AVO and Demo Publisher are the verified fallbacks. Browser demo persistence is local to one browser/device. Background scheduled monitoring and ZIP bundle import remain future work.
 
 Production source commit: `391b489` (implementation commit `f860695`). Production URL: `https://customer-pulse-ai-eight.vercel.app`. Deployment ID: `dpl_Hn4Je6fkDNQT7j18H9wXZTNYvwdW`. Production Playwright acceptance: 5/5 workflows passed, including customer/transaction/conversation/document imports, Maya AVO plus revision/approval/start/execution/response/outcome, marketing scheduling, UX/mobile, and Omar calculated recovery with alert downgrade/resolution.
+
+## Phase 2 customer workspace acceptance
+
+Phase 2 adds customer-specific URLs, semantic and keyboard-accessible navigation, URL-backed Customer 360 tabs, filter/sort/page restoration, advanced operational filters and sorting, summary insights, pagination, mobile cards, scoped export, ERAR-v1 calculation details, and explicit Not Found/Access Denied states. It preserves the Phase 1 authoritative operational store and existing Customer 360 tab content.
+
+Demo assignment policy: Account Executive -> Aisha Rahman. That scope is enforced in the shared provider, lookups, conversations, alerts, recommendations, actions, AVO requests, exports, and relevant audit views. Administrator and Sales Manager have wider authorized demo scope; Auditor remains read-only. Supabase migration `202607190002_customer_assignment_rls.sql` adds assignment-aware RLS and ERAR-v1 fields, but Supabase runtime persistence is still not connected or live-tested.
+
+Phase 2 local gates on 19 July 2026: ESLint passed; TypeScript passed; 109/109 unit tests passed; 44/44 Playwright tests passed; optimized production build passed; npm audit found zero vulnerabilities; secret scan found no real key or private key. These local results do not claim that the Phase 2 commit is deployed. The production URL, deployment ID, commit SHA, and public-browser result below must be updated only after the new Vercel deployment is observed.
