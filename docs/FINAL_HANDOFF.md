@@ -5,10 +5,10 @@ Verification date: 20 July 2026 (Asia/Kuala Lumpur).
 ## Release reference
 
 - Production URL: https://customer-pulse-ai-eight.vercel.app
-- Deployed application commit: `a79de60`
-- Vercel deployment: `dpl_B9cNAkdqjJhZW2jDNGPL7HaJ1mr5` (`READY`, production)
+- Deployed application commit: `a310e88`
+- Vercel deployment: `dpl_33EC4Qthobdm9n9rC7MFG7xT66WG` (`READY`, production)
 - Production MiMo connection: verified against the configured OpenAI-compatible endpoint with model `mimo-v2.5-pro`
-- Current deployed reference predates the project/action-plan changes in this working tree; redeployment and production re-test are required before claiming them in production.
+- Production-focused evidence regression: 3/3 passed against the public alias, including live MiMo Action Plans and bidirectional customer-level campaign recalculation.
 - Imported Workspace mode: selectable project isolation with Supabase persistence for authorised sessions and browser-local fallback without login
 
 ## Problems found during the user walkthrough and resolution
@@ -63,7 +63,7 @@ Verification date: 20 July 2026 (Asia/Kuala Lumpur).
 | Xiaomi MiMo endpoint | Connected; `mimo-v2.5-pro` returned output |
 | npm audit | 0 vulnerabilities at `--audit-level=high` |
 | Secret scan | Passed; `.env.local` ignored/untracked and no real credential/private-key match |
-| Vercel production regression | 45/45 passed against the public production URL in 2.0 minutes |
+| Vercel production regression | 3/3 focused new workflows passed against the public URL in 56.9 seconds; full 48/48 passed locally |
 | Production MiMo AVO | Live chat and structured analysis passed: `Xiaomi MiMo live provider`, `demo: false`, model `mimo-v2.5-pro`, valid evidence IDs and enforced uncertainty |
 
 ## Required environment variables
@@ -94,10 +94,10 @@ Run `supabase/migrations/202607200004_imported_projects.sql` after the earlier m
 
 1. Push the final commit to GitHub.
 2. Confirm all environment variables exist for Production in Vercel.
-3. Redeploy this working tree. The previously recorded deployment does not yet prove the new project and Action Plans features.
+3. Redeploy after future changes. Deployment `dpl_33EC4Qthobdm9n9rC7MFG7xT66WG` currently serves the verified evidence-feedback release.
 4. Check `/api/health`; “configured” means credentials exist, while a completed AVO response proves live use.
 5. Select Imported Workspace, create two projects, import one connected scenario pack into each and verify switching does not mix records.
-6. Run the 47-test Playwright regression against the production URL and record any environment-only failures honestly.
+6. Run the 48-test Playwright regression against the production URL when a full remote regression is required; the focused evidence suite passed 3/3 for this release.
 
 ## Walkthrough roles
 

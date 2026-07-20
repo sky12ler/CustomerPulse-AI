@@ -10,7 +10,7 @@ npm run typecheck
 npm test
 npm run test:e2e
 npm run build
-npm audit --audit-level=low
+npm audit --audit-level=high
 ```
 
 `npm run test:e2e` builds the optimized app, starts it on an isolated port, runs Chromium with a fresh browser context and stops the server.
@@ -27,7 +27,7 @@ npm audit --audit-level=low
 | MiMo endpoint | Connected; `mimo-v2.5-pro` returned model output |
 | npm audit | 0 vulnerabilities at `--audit-level=high` |
 | Secret scan | Passed; `.env.local` ignored/untracked, no credential/private-key match (one known synthetic env assignment in an AVO unit test) |
-| Previous Vercel production Playwright | 45/45 passed against the public URL in 2.0 minutes; new project/action-plan changes are not yet deployed or production-tested |
+| Vercel production Playwright | 3/3 focused evidence-feedback workflows passed in 56.9 seconds; full 48/48 passed locally |
 | Production MiMo requests | Chat and structured analysis passed; `mimo-v2.5-pro` returned `Xiaomi MiMo live provider`, `demo: false`, valid evidence IDs and enforced uncertainty |
 
 This table is intentionally conservative and is updated only after each command completes.
