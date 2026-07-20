@@ -27,7 +27,8 @@ Verification date: 20 July 2026 (Asia/Kuala Lumpur).
 | Pages contradicted one another on risk | Overview, Customers, Customer 360, Alerts and Analytics read the same authoritative operational dataset |
 | AVO reused fixed recommendations | Each analysis creates a customer- and analysis-specific recommendation with its own ID and evidence |
 | AVO provided only one message-style action | Every analysis returns exactly three operational plans plus one separate customer-message draft |
-| Chosen AVO work was not tracked | Administrator selects a plan, assigns owner/deadline, and manually completes it with notes; overdue open plans become Not Completed |
+| Chosen AVO work lacked an evidence feedback loop | Administrator selects a plan; the owner must Start, execute, optionally record response and record outcome; response/outcome recalculates risk and overdue work becomes Not Completed |
+| Campaign results could not change customer risk | Aggregate rows remain analytics-only; customer-level rows with valid response/outcome evidence recalculate the identified customer and audit before/after |
 | Imported conversations could not validate as AVO evidence | Confirmed imported messages are evidence-bearing; confidence reflects evidence volume, validated signals persist and churn recalculates |
 | Ask AVO returned one scripted insufficient-evidence answer | Chat now handles greetings and ordinary questions, queries the active accessible workspace and visibly identifies Xiaomi live output or the operational fallback |
 | Alert Centre reconstructed fake fields | It renders operational alerts with stored trigger/evidence, score movement, owner, deadline, ERAR and status |
@@ -56,9 +57,9 @@ Verification date: 20 July 2026 (Asia/Kuala Lumpur).
 | --- | --- |
 | ESLint | Passed |
 | TypeScript | Passed |
-| Vitest | 18 files, 132/132 passed |
+| Vitest | 18 files, 136/136 passed |
 | Local production build | Passed as part of Playwright runner |
-| Local Playwright | 47/47 passed against an optimized production server in 39.4 seconds |
+| Local Playwright | 48/48 passed against an optimized production server in 43.5 seconds |
 | Xiaomi MiMo endpoint | Connected; `mimo-v2.5-pro` returned output |
 | npm audit | 0 vulnerabilities at `--audit-level=high` |
 | Secret scan | Passed; `.env.local` ignored/untracked and no real credential/private-key match |

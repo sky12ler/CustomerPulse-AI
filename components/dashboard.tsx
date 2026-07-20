@@ -669,14 +669,12 @@ function Page({
 }
 
 function ActionPlans({
-  notify,
   go,
 }: {
   notify: (message: string) => void;
   go: (path: string) => void;
 }) {
   const demo = useDemoWorkflow();
-  const [notes, setNotes] = useState<Record<string, string>>({});
   const visibleCustomers = new Set(demo.accessibleCustomers.map((item) => item.id));
   const [today] = useState(() => new Date().toISOString().slice(0, 10));
   const inThreeDays = dateAfterDays(3);
@@ -693,17 +691,8 @@ function ActionPlans({
     });
   const overdue = plans.filter((item) => item.status === "Not Completed");
   const dueSoon = plans.filter(
-    (item) => item.status === "In Progress" && item.deadline >= today && item.deadline <= inThreeDays,
+    (item) => ["Approved and Ready", "In Progress", "Waiting for Customer", "Outcome Required"].includes(item.status) && item.deadline >= today && item.deadline <= inThreeDays,
   );
-  const complete = (actionId: string) => {
-    try {
-      demo.completeActionPlan(actionId, notes[actionId] ?? "");
-      setNotes((current) => ({ ...current, [actionId]: "" }));
-      notify("Action plan marked Completed and added to the project audit history.");
-    } catch (error) {
-      notify(error instanceof Error ? error.message : "Completion failed");
-    }
-  };
   return (
     <div>
       <div className="grid three" style={{ marginBottom: 16 }}>
@@ -745,31 +734,31 @@ function ActionPlans({
               </div>
               {plan.status === "Not Completed" && (
                 <div className="notice danger" style={{ marginTop: 10 }}>
-                  The due date passed before an Administrator recorded completion.
+                  The due date passed before a verified customer or business outcome was recorded. Resume the workflow or cancel it with an audit reason.
                 </div>
               )}
-              {plan.completionNotes && (
+              {plan.outcome && (
                 <div className="notice success" style={{ marginTop: 10 }}>
-                  <strong>Completion notes</strong><div>{plan.completionNotes}</div>
+                  <strong>Recorded outcome</strong><div>{plan.outcome}</div>
                 </div>
               )}
+              {plan.status === "Completed" && (() => {
+                const calculation = demo.dataset.churnCalculations[plan.customerId];
+                return calculation ? (
+                  <div className="notice success" style={{ marginTop: 10 }}>
+                    <strong>Risk recalculated</strong>
+                    <div>Score {calculation.previousScore} → {calculation.score} ({calculation.scoreChange >= 0 ? "+" : ""}{calculation.scoreChange}) · {calculation.triggerType}</div>
+                  </div>
+                ) : null;
+              })()}
               <div className="top-actions" style={{ marginTop: 12 }}>
                 <a className="btn btn-outline" href={`/customers/${plan.customerId}?tab=overview`}>
                   View Customer
                 </a>
-                {(plan.status === "In Progress" || plan.status === "Not Completed") && demo.state.role === "Administrator" && (
-                  <>
-                    <input
-                      aria-label={`Completion notes for ${plan.recommendation}`}
-                      className="input"
-                      value={notes[plan.id] ?? ""}
-                      onChange={(event) => setNotes((current) => ({ ...current, [plan.id]: event.target.value }))}
-                      placeholder="Required completion notes"
-                    />
-                    <button className="btn btn-primary" onClick={() => complete(plan.id)}>
-                      Mark Completed
-                    </button>
-                  </>
+                {plan.status !== "Completed" && (
+                  <button className="btn btn-primary" onClick={() => go(`actions?actionId=${plan.id}`)}>
+                    {plan.status === "Not Completed" ? "Resume execution workflow" : "Open execution workflow"}
+                  </button>
                 )}
               </div>
             </section>
@@ -2897,12 +2886,12 @@ const importOptions = {
   campaign_results: {
     label: "Campaign results",
     formats: "CSV, XLSX",
-    required: "campaign_id, channel, impressions, clicks",
-    use: "Campaign analytics",
+    required: "campaign_id, channel, audience_size, recorded_at",
+    use: "Aggregate analytics; customer_external_id plus response/outcome fields recalculate individual risk",
     roles: "Administrator or Marketing Manager",
     example: "campaign-results.csv",
     blankExt: "csv",
-    blank: "campaign_id,channel,impressions,clicks\n",
+    blank: "campaign_id,campaign_name,channel,status,audience_size,impressions,clicks,responses,conversions,revenue,recorded_at,customer_external_id,response_sentiment,response_text,outcome_type,outcome_notes,customer_revenue\n",
   },
   retention_playbook: {
     label: "Retention playbook",

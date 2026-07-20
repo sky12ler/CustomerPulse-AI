@@ -136,6 +136,18 @@ export type OutcomeType =
   | "Customer churned"
   | "Follow-up required"
   | "Inconclusive";
+export const OUTCOME_TYPES: OutcomeType[] = [
+  "Customer retained",
+  "Complaint resolved",
+  "Offer accepted",
+  "Meeting scheduled",
+  "Purchase completed",
+  "No response",
+  "Customer declined",
+  "Customer churned",
+  "Follow-up required",
+  "Inconclusive",
+];
 export interface ActionOutcomeRecord extends Provenance {
   id: string;
   actionId: string;
@@ -175,7 +187,7 @@ export interface ImportCommitSummary {
   alertsUpdated: number;
   alertsResolved: number;
 }
-const VERSION = "operational-1.0";
+const VERSION = "operational-1.1";
 const now = () => new Date().toISOString();
 const riskFor = (score: number): Risk =>
   score >= 80
@@ -336,18 +348,24 @@ export function calculateChurn(
   dataset.outcomes
     .filter((item) => item.customerId === customerId)
     .forEach((outcome) => {
-      const positive = [
-        "Customer retained",
-        "Complaint resolved",
-        "Offer accepted",
-        "Meeting scheduled",
-        "Purchase completed",
-      ].includes(outcome.type);
+      const outcomeWeights: Record<OutcomeType, number> = {
+        "Customer retained": -60,
+        "Complaint resolved": -60,
+        "Offer accepted": -40,
+        "Meeting scheduled": -20,
+        "Purchase completed": -50,
+        "No response": 10,
+        "Customer declined": 20,
+        "Customer churned": 35,
+        "Follow-up required": 8,
+        Inconclusive: 5,
+      };
+      const points = outcomeWeights[outcome.type];
       add(
-        positive
+        points < 0
           ? "Successful retention outcome"
           : "Failed or inconclusive intervention",
-        positive ? -24 : 10,
+        points,
         [outcome.id],
       );
     });
@@ -357,10 +375,10 @@ export function calculateChurn(
       add(
         "Customer response",
         response.sentiment === "Positive"
-          ? -10
+          ? -20
           : response.sentiment === "Negative"
-            ? 10
-            : -2,
+            ? 15
+            : 0,
         [response.id],
       ),
     );
@@ -867,6 +885,91 @@ export function commitOperationalImport(
         category: str(row.category),
         description: str(row.description),
       });
+    } else if (kind === "campaign_results") {
+      const externalCustomerId = str(row.customer_external_id);
+      if (!externalCustomerId) continue; // Aggregate rows update campaign analytics only.
+      const customer = next.customers.find(
+        (item) =>
+          item.id === externalCustomerId ||
+          item.originalExternalId === externalCustomerId,
+      );
+      if (!customer) {
+        rejected++;
+        continue;
+      }
+      const campaignId = str(row.campaign_id),
+        recordedAt = str(row.recorded_at) || now(),
+        evidenceKey = `${campaignId}-${externalCustomerId}-${recordedAt}`,
+        sentimentValue = str(row.response_sentiment).toLowerCase(),
+        sentiment =
+          sentimentValue === "positive"
+            ? "Positive"
+            : sentimentValue === "negative"
+              ? "Negative"
+              : sentimentValue === "neutral"
+                ? "Neutral"
+                : undefined,
+        outcomeValue = str(row.outcome_type),
+        outcome = OUTCOME_TYPES.find((item) => item === outcomeValue);
+      let evidenceAdded = false;
+      const responseId = `CAM-RSP-${evidenceKey}`;
+      if (sentiment) {
+        next.responses = upsert(next.responses, {
+          ...source(
+            dataset.id,
+            "Manual Upload",
+            responseId,
+            result.filename,
+            batch,
+            actor,
+          ),
+          id: responseId,
+          actionId: `CAMPAIGN-${campaignId}`,
+          customerId: customer.id,
+          channel: str(row.channel) || "Campaign",
+          responseType: "Campaign response",
+          text:
+            str(row.response_text) ||
+            `${sentiment} response recorded for campaign ${campaignId}`,
+          sentiment,
+          receivedAt: recordedAt,
+          recordedBy: actor,
+          evidenceReference: result.filename,
+        });
+        evidenceAdded = true;
+      }
+      if (outcome) {
+        const outcomeId = `CAM-OUT-${evidenceKey}`;
+        next.outcomes = upsert(next.outcomes, {
+          ...source(
+            dataset.id,
+            "Manual Upload",
+            outcomeId,
+            result.filename,
+            batch,
+            actor,
+          ),
+          id: outcomeId,
+          actionId: `CAMPAIGN-${campaignId}`,
+          customerId: customer.id,
+          type: outcome,
+          notes:
+            str(row.outcome_notes) ||
+            `${outcome} recorded from campaign result import`,
+          revenueRecovered: num(row.customer_revenue),
+          supportingReference: sentiment ? responseId : campaignId,
+          recordedBy: actor,
+          recordedAt,
+          confidence: 85,
+          requiresFollowUp: outcome === "Follow-up required",
+        });
+        evidenceAdded = true;
+      }
+      if (!evidenceAdded) {
+        rejected++;
+        continue;
+      }
+      affected.add(customer.id);
     } else {
       const id = batch + "-" + kind;
       next.documents = upsert(next.documents, {
@@ -879,7 +982,9 @@ export function commitOperationalImport(
   const recalculated = recalculateCustomers(
     next,
     [...affected],
-    "Import completed",
+    kind === "campaign_results"
+      ? "Customer-level campaign evidence imported"
+      : "Import completed",
   );
   return {
     dataset: recalculated.dataset,

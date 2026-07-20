@@ -1,4 +1,4 @@
-import type { AuditEvent, Risk, Role, Tier } from "./types";
+import type { AuditEvent, Risk, Role, Sentiment, Tier } from "./types";
 import type { ImportResult } from "./imports";
 import { customers as seedCustomers } from "./demo-data";
 import {
@@ -243,6 +243,13 @@ export interface CampaignResultRecord {
   revenue: number;
   recordedAt: string;
   sourceFileName: string;
+  customerId?: string;
+  customerExternalId?: string;
+  responseSentiment?: Sentiment;
+  responseText?: string;
+  outcomeType?: string;
+  outcomeNotes?: string;
+  customerRevenue?: number;
 }
 
 export interface WalkthroughState {

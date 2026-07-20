@@ -54,7 +54,7 @@ Expected validated analysis:
 - after validated signals are committed, risk recalculates to **Critical, 100**
 - uncertainty remains visible and says staff verification is required
 
-The analysis must show exactly three operational plans plus one separate customer-message draft. Select one plan as Administrator, assign owner and due date, and verify it appears in **Action Plans** with evidence and completion criteria. Completion requires manual notes; an expired open plan becomes **Not Completed**. The separate message draft may then use the existing approval workflow and must belong to Nadia.
+The analysis must show exactly three operational plans plus one separate customer-message draft. Select one plan as Administrator, assign owner and due date, and verify it appears in **Action Plans** with evidence and completion criteria. Start it, confirm execution, record an optional response, then record the outcome; only that evidence recalculates risk. An expired plan without a verified outcome becomes **Not Completed** and can be resumed. The separate message draft uses the same evidence-based outcome workflow and must belong to Nadia.
 
 ### Umar: weak evidence guardrail
 

@@ -8,6 +8,7 @@ From **Data Imports**, select **Administrator** and upload in this order:
 4. Upload `../product-catalogue.pdf` as **Product catalogue**.
 5. Upload `../customer-service-policy.pdf` as **Customer service policy**.
 6. Upload `../marketing-guidelines.pdf` as **Marketing guidelines**.
+7. After recording the baseline scores, upload `04-campaign-customer-results.csv` as **Campaign results**. Alicia has positive/retained evidence and Chen has negative/declined evidence; both must recalculate from their own customer-level rows.
 
 ## Expected cases
 

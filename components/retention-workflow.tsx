@@ -8,7 +8,7 @@ import type {
   RecommendationRecord,
   RetentionActionRecord,
 } from "@/lib/demo-workflow";
-import type { Role } from "@/lib/types";
+import type { Role, Sentiment } from "@/lib/types";
 import type { OutcomeType } from "@/lib/operational";
 import { useDemoWorkflow } from "./workflow-context";
 import { WorkflowGuide } from "./workflow-guide";
@@ -334,6 +334,8 @@ export function ActionsV2({
   const [comment, setComment] = useState("");
   const [reason, setReason] = useState("");
   const [response, setResponse] = useState("");
+  const [responseSentiment, setResponseSentiment] = useState<Sentiment>("Positive");
+  const [responseExpected, setResponseExpected] = useState(true);
   const [outcome, setOutcome] = useState("");
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
@@ -405,16 +407,26 @@ export function ActionsV2({
       const customer = demo.accessibleCustomers.find(
         (c) => c.id === action.customerId,
       );
-      if (!customer || !canOutreach(customer, "WhatsApp"))
+      const actionType = action.actionType.toLowerCase();
+      const outreachChannel = actionType.includes("whatsapp")
+        ? "WhatsApp"
+        : actionType.includes("email")
+          ? "Email"
+          : undefined;
+      if (outreachChannel && (!customer || !canOutreach(customer, outreachChannel)))
         throw new Error(
-          "WhatsApp action is unavailable because customer consent has been withdrawn.",
+          `${outreachChannel} action is unavailable because consent or contact details are missing.`,
         );
       demo.executeAction(
         action.id,
-        true,
-        "Approved WhatsApp deep link opened and execution confirmed",
+        responseExpected,
+        `${outreachChannel ?? "Operational"} action execution confirmed`,
       );
-      setSuccess("Execution confirmed. Waiting for Customer is now active.");
+      setSuccess(
+        responseExpected
+          ? "Execution confirmed. Waiting for Customer is now active."
+          : "Execution confirmed. Record the business outcome next.",
+      );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Execution failed");
     }
@@ -422,7 +434,7 @@ export function ActionsV2({
   const captureResponse = () => {
     setError("");
     try {
-      demo.recordResponse(action.id, response, "Positive");
+      demo.recordResponse(action.id, response, responseSentiment);
       setSuccess(
         "Customer response stored separately. Record the business outcome next.",
       );
@@ -450,6 +462,7 @@ export function ActionsV2({
     "Waiting for Customer": 4,
     "Outcome Required": 5,
     Completed: 6,
+    "Not Completed": 3,
   };
   const current = lifecycleIndex[action?.status ?? "Draft"] ?? 0;
   return (
@@ -585,12 +598,16 @@ export function ActionsV2({
           comment={comment}
           reason={reason}
           response={response}
+          responseSentiment={responseSentiment}
+          responseExpected={responseExpected}
           outcome={outcome}
           success={success}
           error={error}
           setComment={setComment}
           setReason={setReason}
           setResponse={setResponse}
+          setResponseSentiment={setResponseSentiment}
+          setResponseExpected={setResponseExpected}
           setOutcome={setOutcome}
           decide={decide}
           start={start}
@@ -612,12 +629,16 @@ interface ActionDetailProps {
   comment: string;
   reason: string;
   response: string;
+  responseSentiment: Sentiment;
+  responseExpected: boolean;
   outcome: string;
   success: string;
   error: string;
   setComment: (value: string) => void;
   setReason: (value: string) => void;
   setResponse: (value: string) => void;
+  setResponseSentiment: (value: Sentiment) => void;
+  setResponseExpected: (value: boolean) => void;
   setOutcome: (value: string) => void;
   decide: (decision: "Approved" | "Rejected" | "Changes Requested") => void;
   start: () => void;
@@ -636,12 +657,16 @@ function ActionDetail(props: ActionDetailProps) {
     comment,
     reason,
     response,
+    responseSentiment,
+    responseExpected,
     outcome,
     success,
     error,
     setComment,
     setReason,
     setResponse,
+    setResponseSentiment,
+    setResponseExpected,
     setOutcome,
     decide,
     start,
@@ -874,20 +899,35 @@ function ActionDetail(props: ActionDetailProps) {
           {action.status === "In Progress" && (
             <>
               <p>
-                <b>Execution control:</b> Open the approved WhatsApp message,
-                then confirm that execution occurred.
+                <b>Execution control:</b> Perform the approved action, then
+                confirm that execution occurred. Execution alone does not change risk.
               </p>
-              <a
-                className="btn btn-outline"
-                href={
-                  "https://wa.me/?text=" +
-                  encodeURIComponent(action.humanEditedOutput)
-                }
-                target="_blank"
-                rel="noreferrer"
-              >
-                <MessageCircle size={14} /> Open Approved WhatsApp
-              </a>{" "}
+              {action.actionType.toLowerCase().includes("whatsapp") && (
+                <a
+                  className="btn btn-outline"
+                  href={"https://wa.me/?text=" + encodeURIComponent(action.humanEditedOutput)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <MessageCircle size={14} /> Open Approved WhatsApp
+                </a>
+              )}{" "}
+              {action.actionType.toLowerCase().includes("email") && (
+                <a
+                  className="btn btn-outline"
+                  href={"mailto:?body=" + encodeURIComponent(action.humanEditedOutput)}
+                >
+                  Open Approved Email
+                </a>
+              )}{" "}
+              <label className="check" style={{ display: "inline-flex", marginRight: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={responseExpected}
+                  onChange={(event) => setResponseExpected(event.target.checked)}
+                />
+                Customer response required
+              </label>
               <button
                 className="btn btn-primary"
                 disabled={!executor}
@@ -913,6 +953,19 @@ function ActionDetail(props: ActionDetailProps) {
                   value={response}
                   onChange={(e) => setResponse(e.target.value)}
                 />
+              </label>
+              <label className="field">
+                Response classification
+                <select
+                  aria-label="Response classification"
+                  className="input"
+                  value={responseSentiment}
+                  onChange={(event) => setResponseSentiment(event.target.value as Sentiment)}
+                >
+                  <option>Positive</option>
+                  <option>Neutral</option>
+                  <option>Negative</option>
+                </select>
               </label>
               <button
                 className="btn btn-primary"
@@ -1025,6 +1078,26 @@ function ActionDetail(props: ActionDetailProps) {
               </button>
             </>
           )}
+          {action.status === "Not Completed" && (
+            <div className="notice danger">
+              <b>Deadline missed:</b> no verified outcome was recorded before {action.deadline}.
+              <div style={{ marginTop: 8 }}>
+                <button className="btn btn-primary" disabled={!executor} onClick={start}>
+                  Resume Action
+                </button>
+              </div>
+            </div>
+          )}
+          {action.status === "Completed" && (() => {
+            const calculation = demo.dataset.churnCalculations[action.customerId];
+            return calculation ? (
+              <div className="notice success">
+                <b>Outcome recorded and risk recalculated:</b>{" "}
+                score {calculation.previousScore} → {calculation.score}{" "}
+                ({calculation.scoreChange >= 0 ? "+" : ""}{calculation.scoreChange}).
+              </div>
+            ) : null;
+          })()}
           <h3>Approval and audit history</h3>
           {action.history.map((item, index) => (
             <div className="evidence" key={`${item.at}-${index}`}>

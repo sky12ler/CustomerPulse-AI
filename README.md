@@ -13,9 +13,9 @@ CustomerPulse AI joins customer, transaction and authorised-conversation evidenc
 - Deterministic tiering, hybrid churn calculation and ERAR-v1: eligible future 90-day revenue multiplied by normalized churn probability.
 - Dynamic alerts plus evidence-linked AVO analysis with confidence, uncertainty and abstention safeguards.
 - Exactly three operational AVO action plans and one separate customer-message draft per structured analysis.
-- A dedicated Action Plans queue: Administrator selection, owner/deadline assignment, reminders, completion criteria, manual completion notes and automatic `Not Completed` status after the deadline.
+- A dedicated Action Plans queue: Administrator selection, owner/deadline assignment, reminders and completion criteria. Plans require Start, execution, optional response and a verified outcome before completion and risk recalculation.
 - Governed retention approval and distinct start, execution, response and outcome transitions. Outcomes rerun the risk engine and update alerts, metrics, analytics and audit.
-- Calculated segment opportunities, consent-safe campaign audiences, seven-step campaign creation, separate-person approval, Demo Publisher scheduling, calendar lifecycle and imported results.
+- Calculated segment opportunities, consent-safe campaign audiences, seven-step campaign creation, separate-person approval, Demo Publisher scheduling, calendar lifecycle and imported results. Customer-level result rows recalculate named customers; aggregate rows remain analytics-only.
 - Honest provider states: live Xiaomi MiMo only after a successful response, explicit Demo AVO fallback, disabled Buffer without credentials and clearly labelled Demo Publisher.
 - Project Data Library views imported customers, transactions, conversations, products and documents, exports raw data/extracted text and downloads original files.
 
@@ -96,7 +96,7 @@ npm run build
 npm audit --audit-level=high
 ```
 
-Latest local result: ESLint and TypeScript passed; 18 Vitest files with 132/132 tests passed; the optimized production build passed; 47/47 Playwright workflows passed; npm audit found zero vulnerabilities. The current project/action-plan working tree has not yet been redeployed or re-tested on Vercel, so the previous production result must not be treated as verification of these new changes.
+Latest local result: ESLint and TypeScript passed; 18 Vitest files with 136/136 tests passed; the optimized production build passed; 48/48 Playwright workflows passed. See `docs/TESTING.md` for the exact security and production verification status.
 
 ## Deployment
 

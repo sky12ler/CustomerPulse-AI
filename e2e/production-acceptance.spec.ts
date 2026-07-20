@@ -143,7 +143,7 @@ test("Production acceptance B — Maya analysis through recorded outcome and aud
   await page
     .getByRole("button", { name: /Record Outcome and Recalculate Risk/ })
     .click();
-  await expect(page.locator(".notice.success")).toContainText(
+  await expect(page.locator(".action-detail [role='status']")).toContainText(
     "were recalculated",
   );
   await page.getByRole("link", { name: "Audit Reports" }).click();

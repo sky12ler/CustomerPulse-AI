@@ -1,0 +1,3 @@
+campaign_id,campaign_name,channel,status,audience_size,impressions,clicks,responses,conversions,revenue,recorded_at,customer_external_id,response_sentiment,response_text,outcome_type,outcome_notes,customer_revenue
+CAM-IMPORTED-RECOVERY,West Manufacturing Recovery,Email,completed,8,8,1,1,1,4800,2026-07-20,IMP-RISK-001,Positive,The service recovery was helpful and we will continue,Customer retained,Customer confirmed renewal after the recovery campaign,4800
+CAM-IMPORTED-RECOVERY,West Manufacturing Recovery,Email,completed,8,8,1,1,0,0,2026-07-20,IMP-PRICE-003,Negative,The price concern remains unresolved,Customer declined,Customer declined the proposed offer because of price,0

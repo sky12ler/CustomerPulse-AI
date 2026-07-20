@@ -260,6 +260,80 @@ describe("Phase 1 operational import pipeline", () => {
   });
 });
 
+describe("customer-level campaign evidence", () => {
+  it("recalculates each identified customer up or down from response and outcome evidence", () => {
+    const initial = createDataset("imported", [
+      customer({ id: "RECOVER", frequencyTrend: 0, spendTrend: 0 }),
+      customer({ id: "DECLINE", frequencyTrend: 0, spendTrend: 0 }),
+    ]);
+    const recoverBefore = initial.churnCalculations.RECOVER.score;
+    const declineBefore = initial.churnCalculations.DECLINE.score;
+    const committed = commitOperationalImport(
+      initial,
+      imported("campaign_results", [
+        {
+          campaign_id: "CAM-1",
+          campaign_name: "Recovery",
+          channel: "Email",
+          status: "completed",
+          audience_size: 2,
+          recorded_at: "2026-07-20",
+          customer_external_id: "RECOVER",
+          response_sentiment: "Positive",
+          response_text: "We will continue",
+          outcome_type: "Customer retained",
+          outcome_notes: "Renewal confirmed",
+        },
+        {
+          campaign_id: "CAM-1",
+          campaign_name: "Recovery",
+          channel: "Email",
+          status: "completed",
+          audience_size: 2,
+          recorded_at: "2026-07-20",
+          customer_external_id: "DECLINE",
+          response_sentiment: "Negative",
+          response_text: "Still dissatisfied",
+          outcome_type: "Customer declined",
+          outcome_notes: "Offer declined",
+        },
+      ]),
+      "campaign_results",
+      "Administrator",
+    );
+    expect(committed.summary.affectedCustomerIds).toEqual(
+      expect.arrayContaining(["RECOVER", "DECLINE"]),
+    );
+    expect(committed.dataset.responses).toHaveLength(2);
+    expect(committed.dataset.outcomes).toHaveLength(2);
+    expect(committed.dataset.churnCalculations.RECOVER.score).toBeLessThan(recoverBefore);
+    expect(committed.dataset.churnCalculations.DECLINE.score).toBeGreaterThan(declineBefore);
+    expect(committed.dataset.churnCalculations.RECOVER.triggerType).toBe(
+      "Customer-level campaign evidence imported",
+    );
+  });
+
+  it("keeps aggregate campaign rows analytics-only", () => {
+    const initial = createDataset("imported", [customer()]);
+    const committed = commitOperationalImport(
+      initial,
+      imported("campaign_results", [{
+        campaign_id: "CAM-AGG",
+        campaign_name: "Aggregate",
+        channel: "Email",
+        status: "completed",
+        audience_size: 20,
+        recorded_at: "2026-07-20",
+      }]),
+      "campaign_results",
+      "Administrator",
+    );
+    expect(committed.summary.affectedCustomerIds).toEqual([]);
+    expect(committed.dataset.responses).toEqual([]);
+    expect(committed.dataset.outcomes).toEqual([]);
+  });
+});
+
 describe("Phase 1 AVO and authoritative scoring", () => {
   it("7 AVO analysis creates validated signals", () => {
     const ds = createDataset("demo", [customer()]);

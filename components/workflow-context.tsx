@@ -147,7 +147,6 @@ interface WorkflowContextValue {
     owner: string,
     dueDate: string,
   ) => RetentionActionRecord;
-  completeActionPlan: (actionId: string, notes: string) => void;
   recalculate: (customerId: string, trigger?: string) => void;
   updateCampaign: (patch: Partial<CampaignDraft>) => void;
   openCampaignFromOpportunity: (opportunityId: string) => CampaignDraft;
@@ -574,7 +573,7 @@ export function DemoWorkflowProvider({
           validCount: result.validCount,
           invalidCount: result.invalidCount,
           duplicateCount: result.duplicateCount,
-          recordsAdded: summary.added,
+          recordsAdded: type === "campaign_results" ? result.validCount : summary.added,
           recordsUpdated: summary.updated,
           recordsRejected: summary.rejected,
           chunksCreated: result.chunks?.length ?? 0,
@@ -584,8 +583,21 @@ export function DemoWorkflowProvider({
         };
         const campaignResults: CampaignResultRecord[] =
           type === "campaign_results"
-            ? (result.records ?? result.preview).map((row, index) => ({
-                id: `${String(row.campaign_id)}-${String(row.channel)}-${String(row.recorded_at)}-${index}`,
+            ? (result.records ?? result.preview).map((row, index) => {
+              const customerExternalId = String(row.customer_external_id ?? "").trim();
+              const customer = committed.dataset.customers.find(
+                (item) => item.id === customerExternalId || item.originalExternalId === customerExternalId,
+              );
+              const rawSentiment = String(row.response_sentiment ?? "").trim().toLowerCase();
+              const responseSentiment = rawSentiment === "positive"
+                ? "Positive"
+                : rawSentiment === "negative"
+                  ? "Negative"
+                  : rawSentiment === "neutral"
+                    ? "Neutral"
+                    : undefined;
+              return {
+                id: `${String(row.campaign_id)}-${customerExternalId || "aggregate"}-${String(row.channel)}-${String(row.recorded_at)}-${index}`,
                 datasetId: workspace,
                 sourceType: "Manual Upload",
                 campaignId: String(row.campaign_id ?? ""),
@@ -600,8 +612,29 @@ export function DemoWorkflowProvider({
                 revenue: Number(row.revenue ?? 0),
                 recordedAt: String(row.recorded_at ?? timestamp()),
                 sourceFileName: result.filename,
-              }))
+                customerId: customer?.id,
+                customerExternalId: customerExternalId || undefined,
+                responseSentiment: responseSentiment as Sentiment | undefined,
+                responseText: String(row.response_text ?? "") || undefined,
+                outcomeType: String(row.outcome_type ?? "") || undefined,
+                outcomeNotes: String(row.outcome_notes ?? "") || undefined,
+                customerRevenue: Number(row.customer_revenue ?? 0),
+              };
+            })
             : [];
+        const campaignRiskEvents = type === "campaign_results"
+          ? summary.affectedCustomerIds.map((customerId) => {
+              const before = current.datasets[workspace].churnCalculations[customerId]?.score ?? 0;
+              const after = committed.dataset.churnCalculations[customerId]?.score ?? before;
+              return createEvent(
+                current,
+                "Customer-level campaign evidence imported and risk recalculated",
+                `${id} / ${customerId}`,
+                "Success",
+                `Score ${before} -> ${after}`,
+              );
+            })
+          : [];
         const next = {
           ...current,
           activeWorkspace: workspace,
@@ -630,6 +663,7 @@ export function DemoWorkflowProvider({
               ]
             : current.campaignResults,
           events: [
+            ...campaignRiskEvents,
             createEvent(
               current,
               "Operational import committed",
@@ -801,9 +835,9 @@ export function DemoWorkflowProvider({
         approver: actorForRole(state.role),
         requester: actorForRole(state.role),
         deadline: dueDate,
-        status: "In Progress",
+        status: "Approved and Ready",
         approvalStatus: "Administrator selected",
-        executionStatus: "In Progress",
+        executionStatus: "Not started",
         confidence: `${analysis.confidence}%`,
         uncertainty: "AVO proposed this plan; a human remains responsible for execution and completion.",
         evidence: plan.evidence_ids,
@@ -813,52 +847,20 @@ export function DemoWorkflowProvider({
         rejectionReason: "",
         outcome: "",
         customerResponse: "",
-        startedAt: at,
-        startedBy: actorForRole(state.role),
         selectedPlanId: plan.id,
         completionCriteria: plan.completion_criteria,
         versions: [{ version: 1, content: plan.description, actor: actorForRole(state.role), at }],
-        history: [{ status: "In Progress", actor: actorForRole(state.role), role: state.role, comment: `AVO action plan selected; due ${dueDate}`, at }],
+        history: [{ status: "Approved and Ready", actor: actorForRole(state.role), role: state.role, comment: `AVO action plan selected and approved by Administrator; owner ${owner.trim()}; due ${dueDate}`, at }],
       };
       update((current) => ({
         ...current,
         actions: [action, ...current.actions],
         events: [
-          createEvent(current, "AVO action plan selected", action.id, "In Progress", `${plan.id}; owner ${owner.trim()}; due ${dueDate}`),
+          createEvent(current, "AVO action plan selected", action.id, "Approved and Ready", `${plan.id}; owner ${owner.trim()}; due ${dueDate}; execution and outcome still required`),
           ...current.events,
         ],
       }));
       return action;
-    },
-    [actorForRole, createEvent, state, update],
-  );
-
-  const completeActionPlan = useCallback(
-    (actionId: string, notes: string) => {
-      if (state.role !== "Administrator")
-        throw new Error("Only an Administrator can complete an AVO action plan");
-      const action = state.actions.find((item) => item.id === actionId && item.sourceType === "AVO Action Plan");
-      if (!action) throw new Error("Action plan was not found");
-      if (!notes.trim()) throw new Error("Completion notes are required");
-      if (action.status === "Completed") return;
-      const at = timestamp();
-      update((current) => ({
-        ...current,
-        actions: current.actions.map((item) =>
-          item.id === actionId
-            ? {
-                ...item,
-                status: "Completed",
-                executionStatus: "Completed",
-                outcome: "Completed manually by Administrator",
-                completionNotes: notes.trim(),
-                completedAt: at,
-                history: [...item.history, { fromStatus: item.status, status: "Completed", actor: actorForRole(current.role), role: current.role, comment: notes.trim(), at }],
-              }
-            : item,
-        ),
-        events: [createEvent(current, "AVO action plan completed", actionId, "Completed", notes.trim()), ...current.events],
-      }));
     },
     [actorForRole, createEvent, state, update],
   );
@@ -871,7 +873,7 @@ export function DemoWorkflowProvider({
         const overdue = current.actions.filter(
           (item) =>
             item.sourceType === "AVO Action Plan" &&
-            item.status === "In Progress" &&
+            ["Approved and Ready", "In Progress", "Waiting for Customer", "Outcome Required"].includes(item.status) &&
             item.deadline < today,
         );
         if (!overdue.length) return current;
@@ -887,11 +889,11 @@ export function DemoWorkflowProvider({
                   history: [
                     ...item.history,
                     {
-                      fromStatus: "In Progress",
+                      fromStatus: item.status,
                       status: "Not Completed",
                       actor: "CustomerPulse Scheduler",
                       role: "Administrator",
-                      comment: `Due date ${item.deadline} passed without manual completion`,
+                      comment: `Due date ${item.deadline} passed before a verified outcome was recorded`,
                       at,
                     },
                   ],
@@ -905,7 +907,7 @@ export function DemoWorkflowProvider({
                 "AVO action plan overdue",
                 item.id,
                 "Not Completed",
-                `In Progress -> Not Completed; due ${item.deadline}`,
+                `${item.status} -> Not Completed; due ${item.deadline}`,
               ),
             ),
             ...current.events,
@@ -1174,7 +1176,7 @@ export function DemoWorkflowProvider({
   const startAction = useCallback(
     (actionId: string) => {
       const item = state.actions.find((candidate) => candidate.id === actionId);
-      if (!item || item.status !== "Approved and Ready")
+      if (!item || !["Approved and Ready", "Not Completed"].includes(item.status))
         throw new Error("Manager approval is required before starting");
       assertActionTransition(item.status, "In Progress");
       const actor = actorForRole(state.role);
@@ -1194,11 +1196,11 @@ export function DemoWorkflowProvider({
                 history: [
                   ...candidate.history,
                   {
-                    fromStatus: "Approved and Ready",
+                    fromStatus: item.status,
                     status: "In Progress",
                     actor,
                     role: state.role,
-                    comment: "Approved action started",
+                    comment: item.status === "Not Completed" ? "Overdue action resumed" : "Approved action started",
                     at,
                   },
                 ],
@@ -1211,7 +1213,7 @@ export function DemoWorkflowProvider({
             "Retention action started",
             actionId,
             "In Progress",
-            "Approved and Ready -> In Progress",
+            `${item.status} -> In Progress`,
           ),
           ...current.events,
         ],
@@ -1298,6 +1300,7 @@ export function DemoWorkflowProvider({
       update((current) => {
         const workspace = current.activeWorkspace;
         const dataset = current.datasets[workspace];
+        const before = dataset.churnCalculations[item.customerId]?.score ?? 0;
         const response = {
           datasetId: workspace,
           sourceType: "Staff Entry" as const,
@@ -1318,6 +1321,7 @@ export function DemoWorkflowProvider({
           [item.customerId],
           "Customer response recorded",
         ).dataset;
+        const after = recalculated.churnCalculations[item.customerId]?.score ?? before;
         return {
           ...current,
           datasets: { ...current.datasets, [workspace]: recalculated },
@@ -1355,7 +1359,7 @@ export function DemoWorkflowProvider({
               "Customer response recorded",
               actionId + " / " + item.customerId + " / " + response.id,
               "Outcome Required",
-              "Waiting for Customer -> Outcome Required; action " + actionId,
+              `Waiting for Customer -> Outcome Required; action ${actionId}; Score ${before} -> ${after}`,
             ),
             ...current.events,
           ],
@@ -1913,7 +1917,6 @@ export function DemoWorkflowProvider({
       storeAnalysis,
       createRecommendation,
       selectActionPlan,
-      completeActionPlan,
       recalculate,
       updateCampaign,
       openCampaignFromOpportunity,
@@ -1962,7 +1965,6 @@ export function DemoWorkflowProvider({
       storeAnalysis,
       createRecommendation,
       selectActionPlan,
-      completeActionPlan,
       recalculate,
       updateCampaign,
       openCampaignFromOpportunity,

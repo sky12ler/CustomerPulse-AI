@@ -116,6 +116,34 @@ describe("all permanent mock imports", () => {
     expect(result.duplicateCount).toBe(1);
     expect(result.errors.some((e) => e.field === "customer_name")).toBe(true);
   });
+  it("accepts multiple customer-level results for one campaign", async () => {
+    const csv =
+      "campaign_id,campaign_name,channel,status,audience_size,recorded_at,customer_external_id,response_sentiment,outcome_type\n" +
+      "CAM-1,Recovery,Email,completed,2,2026-07-20,CUS-1,Positive,Customer retained\n" +
+      "CAM-1,Recovery,Email,completed,2,2026-07-20,CUS-2,Negative,Customer declined\n";
+    const result = await validateImportFile(
+      "campaign-results-customer-level.csv",
+      "text/csv",
+      Buffer.from(csv),
+    );
+    expect(result.valid, result.errors.map((item) => item.message).join("; ")).toBe(true);
+    expect(result.validCount).toBe(2);
+    expect(result.duplicateCount).toBe(0);
+  });
+  it("rejects customer-level campaign rows without valid evidence", async () => {
+    const csv =
+      "campaign_id,campaign_name,channel,status,audience_size,recorded_at,customer_external_id,response_sentiment,outcome_type\n" +
+      "CAM-1,Recovery,Email,completed,1,2026-07-20,CUS-1,Unclear,Made up outcome\n";
+    const result = await validateImportFile(
+      "campaign-results-invalid.csv",
+      "text/csv",
+      Buffer.from(csv),
+    );
+    expect(result.valid).toBe(false);
+    expect(result.errors.map((item) => item.code)).toEqual(
+      expect.arrayContaining(["invalid_sentiment", "invalid_outcome"]),
+    );
+  });
   it("rejects disguised and oversized files", async () => {
     const disguised = await validateImportFile(
       "fake.pdf",

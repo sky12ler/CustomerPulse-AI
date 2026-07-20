@@ -40,7 +40,9 @@ Say: “The Synthetic Demo Workspace resets safely. Imported Workspace needs no 
 
 Create `Original Mixed-Risk Project`, upload the three connected scenario CSVs and show Alicia in Customers. Create `Alternate Healthcare Project`, upload the alternate pack, show Nadia, then switch back and show that Alicia returns without either dataset being mixed. Open Project Data Library to show imported conversations, transactions and downloadable documents.
 
-Open an analysed customer's AVO result. Show the three operational plans and the separate message draft. As Administrator, choose one plan, assign an owner and due date, then open Action Plans to show its reminder, evidence and completion criteria. Explain that completion is manual and overdue open plans become `Not Completed`.
+Open an analysed customer's AVO result. Show the three operational plans and the separate message draft. As Administrator, choose one plan and assign owner/due date. In Action Plans, open its execution workflow: Start, confirm execution, classify the customer response, and record the outcome. Show the audited before/after risk. Explain that a click never lowers risk; evidence may lower, preserve or raise it, and missing the deadline becomes `Not Completed`.
+
+For campaign feedback, upload `mock-data/scenarios/04-campaign-customer-results.csv`. Show Alicia decreasing from positive/retained evidence and Chen increasing from negative/declined evidence. Explain that aggregate campaign rows update analytics but cannot identify an individual customer.
 
 Close: “CustomerPulse is useful beyond a scripted demo: evidence changes operational state; consent and approval block unsafe actions; outcomes feed back into risk and analytics. Demo Publisher does not claim external posting, and live-provider fallback is always visible.”
 

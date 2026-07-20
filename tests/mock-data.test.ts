@@ -54,6 +54,7 @@ describe("permanent mock imports", () => {
       "01-customers-mixed-risk.csv",
       "02-transactions-mixed-risk.csv",
       "03-conversations-mixed-risk.csv",
+      "04-campaign-customer-results.csv",
       "UPLOAD_MANIFEST.md",
     ];
     files.forEach((file) => expect(existsSync(path.join(root, file)), file).toBe(true));

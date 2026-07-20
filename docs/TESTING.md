@@ -21,9 +21,9 @@ npm audit --audit-level=low
 | --- | --- |
 | ESLint | Passed, zero errors |
 | TypeScript | Passed with `tsc --noEmit` |
-| Vitest | 18 files, 132/132 passed |
+| Vitest | 18 files, 136/136 passed |
 | Local production build | Passed |
-| Local Playwright | 47/47 passed against the optimized production server in 39.4 seconds |
+| Local Playwright | 48/48 passed against the optimized production server in 43.5 seconds |
 | MiMo endpoint | Connected; `mimo-v2.5-pro` returned model output |
 | npm audit | 0 vulnerabilities at `--audit-level=high` |
 | Secret scan | Passed; `.env.local` ignored/untracked, no credential/private-key match (one known synthetic env assignment in an AVO unit test) |
@@ -34,11 +34,11 @@ This table is intentionally conservative and is updated only after each command 
 
 ## Coverage
 
-The 132 unit tests cover import parsers and both mock packs, project snapshot isolation, the ordered mixed-risk scenario pipeline, tier/churn/ERAR calculations, imported-evidence validation, three-plan-plus-message AVO output, contextual chat answers and Markdown cleanup, MiMo JSON compatibility, prompt-injection stripping, operational mutation, alert idempotency, action transition rules, consent, publisher gates, calculated marketing opportunities/audiences, per-entity persistence and Supabase project/storage schema structure.
+The 136 unit tests cover import parsers and both mock packs, project snapshot isolation, tier/churn/ERAR calculations, customer-level campaign evidence validation and bidirectional recalculation, three-plan-plus-message AVO output, contextual chat answers, MiMo compatibility, operational mutation, alert idempotency, action transitions, consent, publisher gates, calculated marketing opportunities/audiences, persistence and Supabase schema structure.
 
 The 45 browser workflows cover Imported Workspace import/recalculation, Customers and Customer 360 navigation/access/filter/sort/pagination/export/mobile behavior, Maya’s complete retention workflow, campaign creation/approval/calendar, Omar’s outcome recalculation, guided scenarios and audit chains.
 
-The 47 browser workflows also verify two user-created projects without data mixing, the project data library and original-PDF download, three AVO plans plus a message, Action Plan assignment/manual completion, and automatic overdue status on reload.
+The 48 browser workflows also verify two projects without data mixing, original-PDF download, three AVO plans plus a message, full Action Plan execution/response/outcome recalculation, overdue status/resumption, and customer-level campaign evidence moving two identified customers in opposite risk directions.
 
 ## Live-provider interpretation
 

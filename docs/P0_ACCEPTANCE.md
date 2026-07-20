@@ -12,7 +12,8 @@ Verification date: 19 July 2026. “Verified” below means covered by an observ
 | Dynamic alerts | Operational alerts create/update/resolve/reopen idempotently and render consistently in Alert Centre/Customer 360 | Unit + browser verified |
 | Customer-specific recommendations | New IDs bind customer, analysis and evidence; no shared REC-001 mapping for new analyses | Browser verified |
 | Four AVO choices | Structured output requires exactly three evidence-linked operational plans plus one separate message draft | Unit + browser verified |
-| Action Plan tracking | Admin selection requires owner/deadline; queue shows reminders; manual completion needs notes; expired open work becomes Not Completed | Browser verified |
+| Action Plan feedback loop | Admin selection requires owner/deadline; owner must Start, execute, optionally record response and record outcome; outcome recalculates risk; expired work becomes Not Completed and can be resumed | Unit + browser verified |
+| Campaign feedback loop | Aggregate results update analytics only; valid customer-level response/outcome rows recalculate the identified customer and audit before/after | Unit + browser verified |
 | Changes Requested loop | Reviewer comment → Draft Revision → new version → resubmission → different-user approval | Browser + unit verified |
 | Separate execution lifecycle | Start, execution, customer response and outcome are distinct transitions with role/status guards | Browser + unit verified |
 | Outcome recalculation | Stored outcome invokes real recalculation and updates score/alert/metrics/analytics using actual before/after | Browser + unit verified |
@@ -34,9 +35,9 @@ Verification date: 19 July 2026. “Verified” below means covered by an observ
 
 - ESLint: passed.
 - TypeScript: passed.
-- Vitest: 18 files, 132/132 passed.
+- Vitest: 18 files, 136/136 passed.
 - Production build: passed.
-- Playwright: 47/47 passed against the optimized local production server.
+- Playwright: 48/48 passed against the optimized local production server.
 - MiMo: production OpenAI-compatible requests succeeded with `mimo-v2.5-pro`; browser Scenario B also completed the AVO route during regression.
 - npm audit: 0 vulnerabilities at high threshold. Secret scan passed with `.env.local` ignored and untracked. The earlier public Vercel release passed 45/45; the current project/action-plan working tree still requires deployment and a fresh production regression.
 

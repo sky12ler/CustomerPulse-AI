@@ -10,4 +10,6 @@ Confirmation now performs validation -> normalization -> stable-ID upsert -> aff
 
 Imports always enter Imported Workspace; the permanent Demo Workspace is not silently mixed or overwritten. Customers preserve related transactions and messages. Conversation imports do not claim complaints until AVO analysis runs. The success result reports added, updated, rejected, affected customers, recalculations, and alert changes.
 
+Campaign-result imports support two evidence levels. Aggregate rows update campaign analytics only. Rows containing `customer_external_id` plus a valid `response_sentiment` and/or `outcome_type` create customer evidence, run operational-1.1 risk recalculation, and audit the before/after score. Invalid sentiments/outcomes or customer evidence without an identifier are rejected.
+
 Load Demo Data requires no upload. Individual incremental imports and Multi-file Quick Import are available. Quick Import detects types, asks for confirmation, and orders dependencies. ZIP bundle ingestion is not implemented. Optional missing conversations lower confidence; missing policies/products limit grounded suggestions but do not block behavioural scoring.

@@ -64,12 +64,16 @@ test("user-created imported projects isolate the complete operational view", asy
   await expect(page.getByRole("link", { name: "Nadia Escalation", exact: true })).toHaveCount(0);
 });
 
-test("AVO returns three plans plus a message and selected plan becomes a manually completed task", async ({ page }) => {
+test("AVO plan requires execution evidence and outcome before risk-aware completion", async ({ page }) => {
   await clean(page, "/conversations");
   await page.getByRole("button", { name: "Run AVO Analysis" }).click();
   await expect(page.getByRole("heading", { name: "Choose one of three AVO action plans" })).toBeVisible({ timeout: 60_000 });
   await expect(page.getByRole("button", { name: "Choose this plan" })).toHaveCount(3);
   await expect(page.getByRole("heading", { name: "4. Customer message draft" })).toBeVisible();
+  const beforeScore = await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem("customerpulse-demo-v2") ?? "{}");
+    return state.datasets.demo.churnCalculations["CUS-1001"].score as number;
+  });
 
   const firstPlan = page.locator(".evidence").filter({ has: page.getByRole("button", { name: "Choose this plan" }) }).first();
   const selectedPlanTitle = (await firstPlan.locator("strong").first().innerText()).replace(/^1\.\s*/, "");
@@ -77,10 +81,23 @@ test("AVO returns three plans plus a message and selected plan becomes a manuall
   await page.getByRole("button", { name: "Assign and track action plan" }).click();
   await page.goto("/action-plans");
   await expect(page.getByRole("heading", { name: selectedPlanTitle })).toBeVisible();
-  await page.getByLabel(/Completion notes/).fill("Manager verified the remedy and recorded the customer update.");
-  await page.getByRole("button", { name: "Mark Completed" }).click();
-  await expect(page.getByText("Manager verified the remedy and recorded the customer update.")).toBeVisible();
-  await expect(page.getByText("Completed", { exact: true })).toBeVisible();
+  await expect(page.getByText("Approved and Ready", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Open execution workflow" }).click();
+  await page.getByRole("button", { name: "Start Action" }).click();
+  await page.getByRole("button", { name: "Confirm Execution" }).click();
+  await page.getByLabel("Customer response").fill("The recovery work solved the issue and we will continue.");
+  await page.getByLabel("Response classification").selectOption("Positive");
+  await page.getByRole("button", { name: "Record Response" }).click();
+  await page.getByLabel("Action outcome").selectOption("Complaint resolved");
+  await page.getByLabel("Outcome notes").fill("Administrator verified the resolved complaint with the customer.");
+  await page.getByRole("button", { name: "Record Outcome and Recalculate Risk" }).click();
+  await expect(page.getByText(/Outcome recorded and risk recalculated/)).toBeVisible();
+  await expect(page.locator(".action-detail .badge.completed")).toBeVisible();
+  const afterScore = await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem("customerpulse-demo-v2") ?? "{}");
+    return state.datasets.demo.churnCalculations["CUS-1001"].score as number;
+  });
+  expect(afterScore).toBeLessThan(beforeScore);
 
   await page.evaluate(() => {
     const state = JSON.parse(localStorage.getItem("customerpulse-demo-v2") ?? "{}");
@@ -90,8 +107,8 @@ test("AVO returns three plans plus a message and selected plan becomes a manuall
       id: "PLAN-ACT-OVERDUE-TEST",
       selectedPlanId: "PLAN-OVERDUE-TEST",
       recommendation: "Overdue verification plan",
-      status: "In Progress",
-      executionStatus: "In Progress",
+      status: "Approved and Ready",
+      executionStatus: "Not started",
       deadline: "2000-01-01",
       completedAt: undefined,
       completionNotes: undefined,
@@ -99,11 +116,50 @@ test("AVO returns three plans plus a message and selected plan becomes a manuall
     localStorage.setItem("customerpulse-demo-v2", JSON.stringify(state));
   });
   await page.reload();
+  await page.goto("/action-plans");
   await expect(page.getByRole("heading", { name: "Overdue verification plan" })).toBeVisible();
-  await expect(page.getByText("The due date passed before an Administrator recorded completion.")).toBeVisible();
+  await expect(page.getByText(/due date passed before a verified customer or business outcome/)).toBeVisible();
   const storedStatus = await page.evaluate(() => {
     const state = JSON.parse(localStorage.getItem("customerpulse-demo-v2") ?? "{}");
     return state.actions.find((item: { id: string }) => item.id === "PLAN-ACT-OVERDUE-TEST")?.status;
   });
   expect(storedStatus).toBe("Not Completed");
+});
+
+test("customer-level campaign evidence recalculates identified customers in both directions", async ({ page }) => {
+  await clean(page);
+  await page.getByLabel("Active workspace").selectOption("imported");
+  await page.getByLabel("Project name").fill("Campaign Evidence Project");
+  await page.getByRole("button", { name: "Create Project", exact: true }).click();
+  await page.once("dialog", (dialog) => dialog.accept());
+  await page.locator('input[type="file"][multiple]').setInputFiles([
+    path.join(process.cwd(), "mock-data/scenarios/01-customers-mixed-risk.csv"),
+    path.join(process.cwd(), "mock-data/scenarios/02-transactions-mixed-risk.csv"),
+    path.join(process.cwd(), "mock-data/scenarios/03-conversations-mixed-risk.csv"),
+  ]);
+  await expect(page.getByText(/3 files .* added/)).toBeVisible();
+  const before = await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem("customerpulse-demo-v2") ?? "{}");
+    return {
+      recover: state.datasets.imported.churnCalculations["IMP-RISK-001"].score as number,
+      decline: state.datasets.imported.churnCalculations["IMP-PRICE-003"].score as number,
+    };
+  });
+  await page.once("dialog", (dialog) => dialog.accept());
+  await page.locator('input[type="file"][multiple]').setInputFiles(
+    path.join(process.cwd(), "mock-data/scenarios/04-campaign-customer-results.csv"),
+  );
+  await expect(page.getByText(/1 files .* added/)).toBeVisible();
+  const after = await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem("customerpulse-demo-v2") ?? "{}");
+    return {
+      recover: state.datasets.imported.churnCalculations["IMP-RISK-001"],
+      decline: state.datasets.imported.churnCalculations["IMP-PRICE-003"],
+    };
+  });
+  expect(after.recover.score).toBeLessThan(before.recover);
+  expect(after.decline.score).toBeGreaterThan(before.decline);
+  expect(after.recover.triggerType).toBe("Customer-level campaign evidence imported");
+  await page.goto("/audit");
+  await expect(page.getByText("Customer-level campaign evidence imported and risk recalculated").first()).toBeVisible();
 });

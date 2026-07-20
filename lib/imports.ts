@@ -100,6 +100,12 @@ export const templates = {
     "conversions",
     "revenue",
     "recorded_at",
+    "customer_external_id",
+    "response_sentiment",
+    "response_text",
+    "outcome_type",
+    "outcome_notes",
+    "customer_revenue",
   ],
 } as const;
 const required: Record<string, string[]> = {
@@ -153,6 +159,19 @@ const uniqueKey: Record<string, string> = {
   products: "product_sku",
   campaign_results: "campaign_id",
 };
+const campaignSentiments = new Set(["positive", "neutral", "negative"]);
+const campaignOutcomes = new Set([
+  "Customer retained",
+  "Complaint resolved",
+  "Offer accepted",
+  "Meeting scheduled",
+  "Purchase completed",
+  "No response",
+  "Customer declined",
+  "Customer churned",
+  "Follow-up required",
+  "Inconclusive",
+]);
 const maxSize = 10 * 1024 * 1024;
 
 export function inferImportKind(
@@ -433,7 +452,53 @@ export async function validateImportFile(
               message: `${h} is required`,
               value: row[h],
             });
-        const k = String(row[key] ?? "");
+        if (kind === "campaign_results") {
+          const customerId = String(row.customer_external_id ?? "").trim();
+          const sentiment = String(row.response_sentiment ?? "").trim();
+          const outcome = String(row.outcome_type ?? "").trim();
+          if (customerId && !sentiment && !outcome)
+            errors.push({
+              row: i + 2,
+              field: "customer_external_id",
+              code: "missing_customer_evidence",
+              message: "Customer-level campaign results require response_sentiment or outcome_type",
+              value: customerId,
+            });
+          if (!customerId && (sentiment || outcome))
+            errors.push({
+              row: i + 2,
+              field: "customer_external_id",
+              code: "missing_customer",
+              message: "Customer evidence cannot be applied without customer_external_id",
+            });
+          if (sentiment && !campaignSentiments.has(sentiment.toLowerCase()))
+            errors.push({
+              row: i + 2,
+              field: "response_sentiment",
+              code: "invalid_sentiment",
+              message: "response_sentiment must be Positive, Neutral or Negative",
+              value: sentiment,
+            });
+          if (outcome && !campaignOutcomes.has(outcome))
+            errors.push({
+              row: i + 2,
+              field: "outcome_type",
+              code: "invalid_outcome",
+              message: "outcome_type is not a supported retention outcome",
+              value: outcome,
+            });
+        }
+        const k =
+          kind === "campaign_results"
+            ? [
+                row.campaign_id,
+                row.customer_external_id || "aggregate",
+                row.channel,
+                row.recorded_at,
+              ]
+                .map((value) => String(value ?? ""))
+                .join("|")
+            : String(row[key] ?? "");
         if (k && seen.has(k)) {
           duplicates++;
           errors.push({
