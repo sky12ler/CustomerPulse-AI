@@ -23,11 +23,11 @@ npm audit --audit-level=high
 | TypeScript | Passed with `tsc --noEmit` |
 | Vitest | 18 files, 136/136 passed |
 | Local production build | Passed |
-| Local Playwright | 48/48 passed against the optimized production server in 43.5 seconds |
+| Local Playwright | 49/49 passed against the optimized production server in 40.8 seconds |
 | MiMo endpoint | Connected; `mimo-v2.5-pro` returned model output |
 | npm audit | 0 vulnerabilities at `--audit-level=high` |
 | Secret scan | Passed; `.env.local` ignored/untracked, no credential/private-key match (one known synthetic env assignment in an AVO unit test) |
-| Vercel production Playwright | 3/3 focused evidence-feedback workflows passed in 56.9 seconds; full 48/48 passed locally |
+| Vercel production Playwright | 3/3 focused evidence-feedback workflows passed in 56.9 seconds; full 49/49 passed locally |
 | Production MiMo requests | Chat and structured analysis passed; `mimo-v2.5-pro` returned `Xiaomi MiMo live provider`, `demo: false`, valid evidence IDs and enforced uncertainty |
 
 This table is intentionally conservative and is updated only after each command completes.
@@ -38,11 +38,11 @@ The 136 unit tests cover import parsers and both mock packs, project snapshot is
 
 The 45 browser workflows cover Imported Workspace import/recalculation, Customers and Customer 360 navigation/access/filter/sort/pagination/export/mobile behavior, Maya’s complete retention workflow, campaign creation/approval/calendar, Omar’s outcome recalculation, guided scenarios and audit chains.
 
-The 48 browser workflows also verify two projects without data mixing, original-PDF download, three AVO plans plus a message, full Action Plan execution/response/outcome recalculation, overdue status/resumption, and customer-level campaign evidence moving two identified customers in opposite risk directions.
+The 49 browser workflows also verify the neutral `AI-API-configured` label in both workspaces, two projects without data mixing, original-PDF download, three AVO plans plus a message, full Action Plan execution/response/outcome recalculation, overdue status/resumption, and customer-level campaign evidence moving two identified customers in opposite risk directions.
 
 ## Live-provider interpretation
 
-A populated key or `/api/health` value of `xiaomi-mimo-configured` proves configuration, not inference. A live AVO run is claimed only when the response names Xiaomi MiMo and `demo` is false. If the provider request fails, the route returns an explicitly labelled Demo AVO result plus attempted provider and redacted fallback reason.
+A populated key or `/api/health` value of `AI-API-configured` proves configuration, not inference. A live AVO run is claimed only when the response identifies its actual provider and `demo` is false. If the provider request fails, the route returns an explicitly labelled Demo AVO result plus attempted provider and redacted fallback reason.
 
 ## Imported Workspace boundary
 

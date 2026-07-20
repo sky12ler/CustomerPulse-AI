@@ -572,7 +572,7 @@ function DashboardInner({ initialPage }: { initialPage: string }) {
                 <div className="subtle">{sub}</div>
               </div>
               <div className="top-actions">
-                <span className="demo-label">AVO: {serviceHealth.avoProvider === "demo" ? "Demo fallback" : serviceHealth.avoProvider}</span>
+                <span className="demo-label">AVO: {serviceHealth.avoProvider === "demo" ? "Demo fallback" : serviceHealth.avoProvider === "unavailable" ? "Unavailable" : "AI-API-configured"}</span>
                 <span className="demo-label">Publisher: {serviceHealth.publisher === "demo" ? "Demo Publisher" : serviceHealth.publisher}</span>
               </div>
             </div>

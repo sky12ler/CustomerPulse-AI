@@ -96,7 +96,7 @@ npm run build
 npm audit --audit-level=high
 ```
 
-Latest local result: ESLint and TypeScript passed; 18 Vitest files with 136/136 tests passed; the optimized production build passed; 48/48 Playwright workflows passed. See `docs/TESTING.md` for the exact security and production verification status.
+Latest local result: ESLint and TypeScript passed; 18 Vitest files with 136/136 tests passed; the optimized production build passed; 49/49 Playwright workflows passed. See `docs/TESTING.md` for the exact security and production verification status.
 
 ## Deployment
 

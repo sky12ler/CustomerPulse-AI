@@ -59,11 +59,11 @@ Verification date: 20 July 2026 (Asia/Kuala Lumpur).
 | TypeScript | Passed |
 | Vitest | 18 files, 136/136 passed |
 | Local production build | Passed as part of Playwright runner |
-| Local Playwright | 48/48 passed against an optimized production server in 43.5 seconds |
+| Local Playwright | 49/49 passed against an optimized production server in 40.8 seconds |
 | Xiaomi MiMo endpoint | Connected; `mimo-v2.5-pro` returned output |
 | npm audit | 0 vulnerabilities at `--audit-level=high` |
 | Secret scan | Passed; `.env.local` ignored/untracked and no real credential/private-key match |
-| Vercel production regression | 3/3 focused new workflows passed against the public URL in 56.9 seconds; full 48/48 passed locally |
+| Vercel production regression | 3/3 focused new workflows passed against the public URL in 56.9 seconds; full 49/49 passed locally |
 | Production MiMo AVO | Live chat and structured analysis passed: `Xiaomi MiMo live provider`, `demo: false`, model `mimo-v2.5-pro`, valid evidence IDs and enforced uncertainty |
 
 ## Required environment variables
@@ -97,7 +97,7 @@ Run `supabase/migrations/202607200004_imported_projects.sql` after the earlier m
 3. Redeploy after future changes. Deployment `dpl_33EC4Qthobdm9n9rC7MFG7xT66WG` currently serves the verified evidence-feedback release.
 4. Check `/api/health`; “configured” means credentials exist, while a completed AVO response proves live use.
 5. Select Imported Workspace, create two projects, import one connected scenario pack into each and verify switching does not mix records.
-6. Run the 48-test Playwright regression against the production URL when a full remote regression is required; the focused evidence suite passed 3/3 for this release.
+6. Run the 49-test Playwright regression against the production URL when a full remote regression is required; the focused evidence suite passed 3/3 for this release.
 
 ## Walkthrough roles
 

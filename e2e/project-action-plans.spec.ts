@@ -64,6 +64,16 @@ test("user-created imported projects isolate the complete operational view", asy
   await expect(page.getByRole("link", { name: "Nadia Escalation", exact: true })).toHaveCount(0);
 });
 
+test("provider configuration uses the neutral UI label in both workspaces", async ({ page, request }) => {
+  const health = await request.get("/api/health");
+  expect(health.ok()).toBe(true);
+  expect((await health.json()).avoProvider).toBe("AI-API-configured");
+  await clean(page, "/overview");
+  await expect(page.getByText("AVO: AI-API-configured", { exact: true })).toBeVisible();
+  await page.getByLabel("Active workspace").selectOption("imported");
+  await expect(page.getByText("AVO: AI-API-configured", { exact: true })).toBeVisible();
+});
+
 test("AVO plan requires execution evidence and outcome before risk-aware completion", async ({ page }) => {
   await clean(page, "/conversations");
   await page.getByRole("button", { name: "Run AVO Analysis" }).click();

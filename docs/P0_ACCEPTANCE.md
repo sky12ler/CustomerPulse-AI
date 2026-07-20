@@ -37,7 +37,7 @@ Verification date: 19 July 2026. “Verified” below means covered by an observ
 - TypeScript: passed.
 - Vitest: 18 files, 136/136 passed.
 - Production build: passed.
-- Playwright: 48/48 passed against the optimized local production server.
+- Playwright: 49/49 passed against the optimized local production server.
 - MiMo: production OpenAI-compatible requests succeeded with `mimo-v2.5-pro`; browser Scenario B also completed the AVO route during regression.
 - npm audit: 0 vulnerabilities at high threshold. Secret scan passed with `.env.local` ignored and untracked. Vercel deployment `dpl_33EC4Qthobdm9n9rC7MFG7xT66WG` is Ready; the focused project, live-MiMo Action Plan and campaign-evidence production suite passed 3/3.
 
