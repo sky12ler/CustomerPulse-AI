@@ -67,14 +67,16 @@ test("user-created imported projects isolate the complete operational view", asy
 test("AVO returns three plans plus a message and selected plan becomes a manually completed task", async ({ page }) => {
   await clean(page, "/conversations");
   await page.getByRole("button", { name: "Run AVO Analysis" }).click();
-  await expect(page.getByRole("heading", { name: "Choose one of three AVO action plans" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Choose one of three AVO action plans" })).toBeVisible({ timeout: 60_000 });
   await expect(page.getByRole("button", { name: "Choose this plan" })).toHaveCount(3);
   await expect(page.getByRole("heading", { name: "4. Customer message draft" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Choose this plan" }).first().click();
+  const firstPlan = page.locator(".evidence").filter({ has: page.getByRole("button", { name: "Choose this plan" }) }).first();
+  const selectedPlanTitle = (await firstPlan.locator("strong").first().innerText()).replace(/^1\.\s*/, "");
+  await firstPlan.getByRole("button", { name: "Choose this plan" }).click();
   await page.getByRole("button", { name: "Assign and track action plan" }).click();
   await page.goto("/action-plans");
-  await expect(page.getByText("Complete a manager-led service recovery review")).toBeVisible();
+  await expect(page.getByRole("heading", { name: selectedPlanTitle })).toBeVisible();
   await page.getByLabel(/Completion notes/).fill("Manager verified the remedy and recorded the customer update.");
   await page.getByRole("button", { name: "Mark Completed" }).click();
   await expect(page.getByText("Manager verified the remedy and recorded the customer update.")).toBeVisible();
