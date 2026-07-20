@@ -8,7 +8,10 @@ const signInAs = (page: Page, role: string) =>
   page.getByLabel("Demo account").selectOption(role);
 async function clean(page: Page, route = "/overview", role = "Administrator") {
   await page.goto(route);
-  await page.evaluate(() => localStorage.removeItem("customerpulse-demo-v2"));
+  await page.evaluate(() => {
+    localStorage.removeItem("customerpulse-demo-v2");
+    localStorage.removeItem("customerpulse-imported-projects-v1");
+  });
   await page.reload();
   await signInAs(page, role);
 }
@@ -18,6 +21,13 @@ async function upload(
   filename: string,
   source = mock(filename),
 ) {
+  if (await page.getByLabel("Active workspace").isVisible()) {
+    await page.getByLabel("Active workspace").selectOption("imported");
+    if (!(await page.getByLabel("Active imported project").inputValue())) {
+      await page.getByLabel("Project name").fill("Release Test Project");
+      await page.getByRole("button", { name: "Create Project", exact: true }).click();
+    }
+  }
   await page.getByLabel("Import type").selectOption(kind);
   await page.getByRole("button", { name: "Continue" }).click();
   const response = page.waitForResponse(

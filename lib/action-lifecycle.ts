@@ -11,6 +11,7 @@ export const actionTransitions: Record<ActionStatus, ActionStatus[]> = {
   "Waiting for Customer": ["Outcome Required", "Cancelled"],
   "Outcome Required": ["Completed", "Cancelled"],
   Completed: [],
+  "Not Completed": ["In Progress", "Completed", "Cancelled"],
   Cancelled: [],
 };
 export function assertActionTransition(from: ActionStatus, to: ActionStatus) {

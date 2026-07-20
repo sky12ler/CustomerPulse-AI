@@ -2,45 +2,46 @@
 
 > Turn customer evidence into explainable, human-approved retention and marketing action.
 
-CustomerPulse AI is a deployable customer-retention and marketing-intelligence workspace. It joins customer, transaction and authorised-conversation evidence; calculates tiers, churn risk and estimated revenue at risk; uses AVO to extract evidence-linked signals; and moves staff through governed retention and campaign workflows.
+CustomerPulse AI joins customer, transaction and authorised-conversation evidence; calculates tier, churn risk and estimated revenue at risk; uses AVO to extract cited signals; and moves staff through governed retention and campaign workflows. All bundled people and records are synthetic. The product supports privacy controls but does not claim legal or regulatory certification.
 
-All bundled people and records are synthetic. Privacy-supporting controls are implemented, but the project does not claim legal or regulatory certification.
+## Implemented system
 
-## What is implemented
-
-- A shared operational store for imported customers, transactions, conversations, products, analyses, alerts, recommendations, retention actions, campaigns, results and audit events.
-- An isolated, browser-local Imported Workspace where confirmed uploads drive the complete operational pipeline without login.
-- A separate resettable Synthetic Demo Workspace for credential-free judging.
-- Customer 360 routes at `/customers/[customerId]`, role-scoped access, search, 11 filters, seven sort options, pagination, summary metrics and scoped CSV export.
+- User-created Imported Workspace projects. Each project isolates imports, customers, conversations, transactions, documents, analyses, alerts, actions, campaigns, analytics and audit history.
+- Supabase project/entity persistence and private original-file storage for authorised sessions, with a no-login localStorage/IndexedDB fallback.
+- A separate resettable Synthetic Demo Workspace.
+- Customer 360 at `/customers/[customerId]`, role-scoped access, search, filters, sorting, pagination, metrics and scoped export.
 - Deterministic tiering, hybrid churn calculation and ERAR-v1: eligible future 90-day revenue multiplied by normalized churn probability.
-- Dynamic alerts and customer-specific AVO recommendations with evidence, confidence, uncertainty and abstention safeguards.
-- Retention states: Draft → Pending Approval → Changes Requested/revision or Rejected/Approved → In Progress → Waiting for Customer/Outcome Required → Completed.
-- Separate action start, execution, customer-response and outcome transitions. Outcomes run the authoritative risk engine and update customer metrics, alerts, analytics and audit history.
-- Calculated segment opportunities from current operational data. Campaign audiences are recalculated from the selected segment, channel availability and current consent.
-- Blank/list Campaign Studio from navigation, insight-prefilled campaigns from Marketing Intelligence and campaign-specific versions/approval history.
-- Campaign approval, Demo Publisher scheduling, rescheduling, cancellation, published confirmation, imported results, calendar filters and campaign-specific analytics.
-- Honest provider states: live Xiaomi MiMo when its request succeeds, explicit Demo AVO fallback with the reason when it fails, disabled Buffer selection without credentials and clearly selected Demo Publisher.
+- Dynamic alerts plus evidence-linked AVO analysis with confidence, uncertainty and abstention safeguards.
+- Exactly three operational AVO action plans and one separate customer-message draft per structured analysis.
+- A dedicated Action Plans queue: Administrator selection, owner/deadline assignment, reminders, completion criteria, manual completion notes and automatic `Not Completed` status after the deadline.
+- Governed retention approval and distinct start, execution, response and outcome transitions. Outcomes rerun the risk engine and update alerts, metrics, analytics and audit.
+- Calculated segment opportunities, consent-safe campaign audiences, seven-step campaign creation, separate-person approval, Demo Publisher scheduling, calendar lifecycle and imported results.
+- Honest provider states: live Xiaomi MiMo only after a successful response, explicit Demo AVO fallback, disabled Buffer without credentials and clearly labelled Demo Publisher.
+- Project Data Library views imported customers, transactions, conversations, products and documents, exports raw data/extracted text and downloads original files.
 
 ## Architecture
 
 ```text
 Browser / Next.js UI
-  ├─ Demo Workspace → versioned localStorage synthetic state
-  └─ Imported Workspace → versioned localStorage uploaded operational state
+  - Demo Workspace -> versioned synthetic state
+  - Imported Workspace -> user-created selectable projects
+      - Supabase records + private file storage for authorised sessions
+      - localStorage + IndexedDB no-login fallback
 
-Next.js server routes
-  ├─ /api/imports/validate → governed file validation and preview
-  ├─ /api/avo/analyze      → supplied browser-local customer → MiMo/OpenAI-compatible AVO
-  │                          └─ explicit deterministic fallback
-  ├─ /api/publish          → approval gate → Buffer or Demo Publisher
-  └─ /api/health           → configured provider availability
+Next.js routes
+  - /api/imports/validate -> governed validation and preview
+  - /api/avo/analyze      -> project customer evidence -> MiMo or explicit fallback
+  - /api/avo/chat         -> role/project-scoped assistant
+  - /api/publish          -> approval gate -> Buffer or Demo Publisher
+  - /api/health           -> provider configuration state
 
-Domain layer
-  imports → tier/signals → churn/ERAR → alerts → recommendations/actions
-  customer data → segment calculation → consent-filtered campaign → approval/calendar/results
+Domain pipeline
+  imports -> deterministic signals/tier -> AVO signals -> churn/ERAR -> alerts
+  alert -> four recommendations -> selected Action Plan or message approval flow
+  customer data -> segment opportunity -> consent-safe audience -> campaign lifecycle
 ```
 
-AVO does not directly assign the authoritative churn score, approve an action, bypass consent or send customer communications. Deterministic application logic and authorised employees keep those responsibilities.
+AVO does not assign the authoritative churn score, select its own plan, approve an action, bypass consent or send communications. Deterministic logic and authorised employees retain those responsibilities.
 
 ## Local setup
 
@@ -50,9 +51,9 @@ Copy-Item .env.example .env.local
 npm run dev
 ```
 
-Open `http://localhost:3000`. Demo Workspace works without credentials.
+Open `http://localhost:3000`. Demo Workspace and the no-login Imported Workspace fallback work without credentials.
 
-For live AVO in either workspace, configure:
+For live AVO:
 
 ```text
 MIMO_API_KEY=
@@ -60,23 +61,31 @@ MIMO_BASE_URL=https://api.xiaomimimo.com/v1
 MIMO_MODEL=mimo-v2.5-pro
 ```
 
-MiMo credentials are server-only. Never prefix them with `NEXT_PUBLIC_`. A key that is not accepted by the OpenAI-compatible endpoint falls back visibly to Demo AVO.
+MiMo values are server-only; never prefix them with `NEXT_PUBLIC_`. A failed provider request falls back visibly to Demo AVO.
 
-## Imported Workspace persistence
+## Imported projects and Supabase
 
-Imported Workspace is intentionally isolated to the current browser. It requires no account and never exposes a shared anonymous Supabase database. Refreshes preserve the workflow through versioned localStorage; clearing browser storage removes it. The supplied Supabase migrations remain optional future deployment artifacts and are not part of the hackathon walkthrough.
+Create a project before importing. All downstream state is scoped to the selected project; switching projects replaces the complete operational view instead of mixing datasets.
+
+After the earlier migrations, run:
+
+```text
+supabase/migrations/202607200004_imported_projects.sql
+```
+
+It creates `operational_projects`, project-scopes operational records and audit logs, and creates the private `imported-project-files` bucket. With no authenticated Supabase session, the browser-local fallback remains available; clearing browser storage removes that local data.
 
 ## Test data
 
-The original fixtures are in `mock-data/`. A connected mixed-risk pack is in `mock-data/scenarios/`:
+For project one, import from `mock-data/scenarios/` in this order:
 
-1. Upload `01-customers-mixed-risk.csv` as Customers.
-2. Upload `02-transactions-mixed-risk.csv` as Transactions.
-3. Upload `03-conversations-mixed-risk.csv` as Conversations.
+1. `01-customers-mixed-risk.csv`
+2. `02-transactions-mixed-risk.csv`
+3. `03-conversations-mixed-risk.csv`
 
-The pack covers critical complaint/cancellation, growth/product interest, withdrawn consent, insufficient evidence, stable health, recovery and missing-channel cases. See `mock-data/scenarios/UPLOAD_MANIFEST.md` for expected observations.
+For project two, import the different customers, transactions, conversations and PDFs under `mock-data/scenarios/alternate-pack/`. See each pack's manifest for expected results.
 
-## Verification commands
+## Verification
 
 ```powershell
 npm run lint
@@ -84,21 +93,25 @@ npm run typecheck
 npm test
 npm run test:e2e
 npm run build
-npm audit --audit-level=low
+npm audit --audit-level=high
 ```
 
-The current automated baseline is 16 Vitest files / 127 tests and 45 Playwright workflows. The AVO chat accepts ordinary operational questions and grounds answers in the active role-scoped workspace; every reply names the live provider or deterministic fallback actually used. See `docs/TESTING.md` for the last completed run and the distinction between local, provider and deployed-production verification.
+Latest local result: ESLint and TypeScript passed; 18 Vitest files with 132/132 tests passed; the optimized production build passed; 47/47 Playwright workflows passed; npm audit found zero vulnerabilities. The current project/action-plan working tree has not yet been redeployed or re-tested on Vercel, so the previous production result must not be treated as verification of these new changes.
 
 ## Deployment
 
-Push the repository to GitHub, add the MiMo variables in Vercel Project Settings and redeploy. Verify `/api/health`, select Imported Workspace, import the scenario pack, run AVO and refresh the same browser to confirm the operational records remain.
+1. Apply migration `202607200004_imported_projects.sql`.
+2. Push the current code to GitHub.
+3. Add MiMo and existing Supabase values in Vercel Project Settings.
+4. Redeploy, check `/api/health`, and run the Playwright suite against the production URL.
+5. Create two Imported Workspace projects and verify that switching them changes the entire data and analytics view.
 
 ## External boundaries
 
-- MiMo AVO is live only when the response itself succeeds. Otherwise the UI names the attempted provider and fallback reason.
 - Demo Publisher creates application scheduling records; it does not post to a social network.
 - Buffer remains disabled until valid Buffer credentials are configured.
-- WhatsApp/email actions are user-initiated links or staff-confirmed workflow transitions, not automatic delivery or inbound-message ingestion.
-- Image generation and advanced image processing remain optional future work.
+- WhatsApp/email actions are user-initiated links or staff-confirmed transitions, not automatic delivery or inbound-response ingestion.
+- Overdue Action Plans are evaluated when a project loads and every minute while the app is open; an always-on background scheduler is not included.
+- Image generation, advanced image processing and CRM synchronization are not implemented.
 
-See `docs/FINAL_HANDOFF.md`, `docs/P0_ACCEPTANCE.md`, `docs/DEMO_SCRIPT.md`, `docs/DEVPOST_SUBMISSION.md` and `docs/DEPLOYMENT.md`.
+See `docs/FINAL_HANDOFF.md`, `docs/P0_ACCEPTANCE.md`, `docs/DEMO_SCRIPT.md`, `docs/TESTING.md` and `docs/DEPLOYMENT.md`.

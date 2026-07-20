@@ -5,9 +5,15 @@ const mock = (name: string) => path.join(process.cwd(), "mock-data", name);
 
 async function reset(page: Page, route = "/imports") {
   await page.goto(route);
-  await page.evaluate(() => localStorage.removeItem("customerpulse-demo-v2"));
+  await page.evaluate(() => {
+    localStorage.removeItem("customerpulse-demo-v2");
+    localStorage.removeItem("customerpulse-imported-projects-v1");
+  });
   await page.reload();
   await page.getByLabel("Demo account").selectOption("Administrator");
+  await page.getByLabel("Active workspace").selectOption("imported");
+  await page.getByLabel("Project name").fill("Cross-phase Project");
+  await page.getByRole("button", { name: "Create Project", exact: true }).click();
 }
 
 async function importFile(page: Page, kind: string, filename: string) {
@@ -96,7 +102,7 @@ test("Cross-phase imported operational pipeline changes customer state and audit
   expect((await analysed).ok()).toBe(true);
   await expect(page.getByText("Uncertainty", { exact: true })).toBeVisible();
   await page
-    .getByRole("button", { name: "Generate AVO Recommendation" })
+    .getByRole("button", { name: "Create message recommendation for approval" })
     .click();
   await page.getByRole("link", { name: "Recommendations", exact: true }).click();
   await expect(page.getByLabel("Recommendation owner")).not.toHaveValue("");

@@ -1,0 +1,10 @@
+customer_external_id,customer_name,company_name,industry,region,assigned_staff_email,email,phone,preferred_channel,consent_status,customer_since
+ALT-CRISIS-101,Nadia Escalation,Sunrise Clinics,Healthcare,South,Aisha Rahman,nadia@sunrise-clinics.example,601188880101,WhatsApp,granted,2019-03-14
+ALT-PRICE-102,Omar Budget,Meridian Diagnostics,Healthcare,South,Aisha Rahman,omar@meridian-diagnostics.example,601188880102,Email,granted,2020-08-21
+ALT-PRIVATE-103,Priya Restricted,Harbour Medical,Healthcare,South,Aisha Rahman,priya@harbour-medical.example,601188880103,Email,withdrawn,2021-05-09
+ALT-NOPHONE-104,Quentin No Phone,Lotus Care Network,Healthcare,South,Aisha Rahman,quentin@lotus-care.example,,WhatsApp,granted,2022-02-17
+ALT-DORMANT-105,Rosa Dormant,Greenfield Health,Healthcare,South,Aisha Rahman,rosa@greenfield-health.example,601188880105,Email,granted,2018-11-30
+ALT-RECOVER-106,Samuel Recovery,Nova Therapy Group,Healthcare,South,Aisha Rahman,samuel@nova-therapy.example,601188880106,WhatsApp,granted,2020-06-12
+ALT-GROW-107,Talia Expansion,Orbit Systems,Technology,East,Aisha Rahman,talia@orbit-systems.example,601188880107,Email,granted,2023-01-19
+ALT-QUIET-108,Umar Statement,Pixel Works,Technology,East,Aisha Rahman,umar@pixel-works.example,601188880108,Email,granted,2022-09-08
+ALT-STABLE-109,Vivian Stable,Anchor Software,Technology,East,Aisha Rahman,vivian@anchor-software.example,601188880109,WhatsApp,granted,2019-12-01

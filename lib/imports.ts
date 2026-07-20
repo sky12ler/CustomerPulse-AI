@@ -36,6 +36,8 @@ export interface ImportResult {
   extractedText?: string;
   pages?: number;
   chunks?: { page: number; chunk: number; location: string; text: string }[];
+  storedFileKey?: string;
+  originalMimeType?: string;
   audit: { action: string; result: string; at: string };
 }
 

@@ -16,6 +16,7 @@ import {
   accessibleActions,
 } from "@/lib/customer-access";
 import type { ImportResult } from "@/lib/imports";
+import type { AVOActionPlan } from "@/lib/avo";
 import type { Role, Sentiment } from "@/lib/types";
 import {
   assertActionTransition,
@@ -53,11 +54,24 @@ import {
 } from "@/lib/supabase-browser";
 import {
   mergeImportedEntityRecords,
+  mergeImportedWorkspace,
   serializeImportedEntities,
+  snapshotImportedWorkspace,
+  type ImportedWorkspaceSnapshot,
   type PersistedEntityRecord,
 } from "@/lib/workspace-persistence";
 
 const STORAGE_KEY = "customerpulse-demo-v2";
+const PROJECTS_KEY = "customerpulse-imported-projects-v1";
+
+export interface ImportedProject {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+  snapshot: ImportedWorkspaceSnapshot;
+}
 
 interface WorkflowContextValue {
   state: DemoWorkflowState;
@@ -87,7 +101,12 @@ interface WorkflowContextValue {
     customerId: string,
   ) => ReturnType<typeof lookupAccessibleCustomer>;
   switchWorkspace: (workspace: WorkspaceKind) => void;
-  addImport: (result: ImportResult, type: string) => ImportCommitSummary;
+  projects: ImportedProject[];
+  activeProjectId: string;
+  activeProject?: ImportedProject;
+  createProject: (name: string, description?: string) => ImportedProject;
+  switchProject: (projectId: string) => void;
+  addImport: (result: ImportResult, type: string) => Promise<ImportCommitSummary>;
   submitRecommendation: (
     recommendationId: string,
     draft: string,
@@ -122,6 +141,13 @@ interface WorkflowContextValue {
     analysis: Parameters<typeof signalsFromAnalysis>[2],
   ) => string[];
   createRecommendation: (customerId: string) => RecommendationRecord;
+  selectActionPlan: (
+    customerId: string,
+    plan: AVOActionPlan,
+    owner: string,
+    dueDate: string,
+  ) => RetentionActionRecord;
+  completeActionPlan: (actionId: string, notes: string) => void;
   recalculate: (customerId: string, trigger?: string) => void;
   updateCampaign: (patch: Partial<CampaignDraft>) => void;
   openCampaignFromOpportunity: (opportunityId: string) => CampaignDraft;
@@ -148,6 +174,8 @@ export function DemoWorkflowProvider({
     return { ...initial, campaigns: [initial.campaign] };
   });
   const [hydrated, setHydrated] = useState(false);
+  const [projects, setProjects] = useState<ImportedProject[]>([]);
+  const [activeProjectId, setActiveProjectId] = useState("");
   const [persistence, setPersistence] = useState<WorkflowContextValue["persistence"]>({
     configured: supabaseBrowserConfigured(),
     authenticated: false,
@@ -162,6 +190,12 @@ export function DemoWorkflowProvider({
   const databaseActor = useRef("");
   const auditBaseline = useRef<Set<string>>(new Set());
   const remoteApplying = useRef(false);
+  const stateRef = useRef(state);
+  const activeProjectIdRef = useRef(activeProjectId);
+  useEffect(() => {
+    stateRef.current = state;
+    activeProjectIdRef.current = activeProjectId;
+  }, [activeProjectId, state]);
   const actorForRole = useCallback(
     (role: Role) => databaseActor.current || demoActorForRole(role),
     [],
@@ -171,16 +205,47 @@ export function DemoWorkflowProvider({
     const timer = window.setTimeout(() => {
       try {
         const saved = localStorage.getItem(STORAGE_KEY);
+        let restored = createInitialDemoState(audits);
         if (saved) {
           const parsed = JSON.parse(saved) as DemoWorkflowState;
           if (parsed.version === 5) {
-            setState({
+            restored = {
               ...parsed,
               campaigns: parsed.campaigns?.length
                 ? parsed.campaigns
                 : [parsed.campaign],
-            });
+            };
+            setState(restored);
           }
+        }
+        const savedProjects = localStorage.getItem(PROJECTS_KEY);
+        if (savedProjects) {
+          const parsedProjects = JSON.parse(savedProjects) as {
+            activeProjectId: string;
+            projects: ImportedProject[];
+          };
+          setProjects(parsedProjects.projects ?? []);
+          setActiveProjectId(parsedProjects.activeProjectId ?? "");
+          const active = parsedProjects.projects?.find(
+            (item) => item.id === parsedProjects.activeProjectId,
+          );
+          if (active) setState((current) => mergeImportedWorkspace(current, active.snapshot));
+        } else if (
+          restored.datasets.imported.customers.length ||
+          restored.datasets.imported.transactions.length ||
+          restored.imports.length
+        ) {
+          const at = timestamp();
+          const legacy: ImportedProject = {
+            id: globalThis.crypto.randomUUID(),
+            name: "Legacy Imported Project",
+            description: "Imported data migrated from the previous single-workspace format.",
+            createdAt: at,
+            updatedAt: at,
+            snapshot: snapshotImportedWorkspace(restored),
+          };
+          setProjects([legacy]);
+          setActiveProjectId(legacy.id);
         }
       } catch {
         localStorage.removeItem(STORAGE_KEY);
@@ -193,6 +258,32 @@ export function DemoWorkflowProvider({
   useEffect(() => {
     if (hydrated) localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [hydrated, state]);
+  useEffect(() => {
+    if (!hydrated) return;
+    if (activeProjectId && state.activeWorkspace === "imported") {
+      const timer = window.setTimeout(() => {
+        setProjects((current) =>
+          current.map((project) =>
+            project.id === activeProjectId
+              ? {
+                  ...project,
+                  updatedAt: timestamp(),
+                  snapshot: snapshotImportedWorkspace(state),
+                }
+              : project,
+          ),
+        );
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+  }, [activeProjectId, hydrated, state]);
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem(
+      PROJECTS_KEY,
+      JSON.stringify({ activeProjectId, projects }),
+    );
+  }, [activeProjectId, hydrated, projects]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -235,19 +326,48 @@ export function DemoWorkflowProvider({
               : "Account Executive";
       databaseUser.current = { id: user.id, organizationId: profile.organization_id };
       databaseActor.current = profile.display_name || profile.email || user.email || "Authenticated user";
-      const { data: stored, error: loadError } = await client
-        .from("operational_entity_records")
-        .select("entity_type,entity_key,customer_external_id,data")
-        .eq("workspace", "imported")
-        .order("created_at", { ascending: true });
+      const [recordsResult, projectsResult] = await Promise.all([
+        client
+          .from("operational_entity_records")
+          .select("project_id,entity_type,entity_key,customer_external_id,data")
+          .eq("workspace", "imported")
+          .order("created_at", { ascending: true }),
+        client
+          .from("operational_projects")
+          .select("id,name,description,created_at,updated_at")
+          .eq("status", "active")
+          .order("created_at", { ascending: true }),
+      ]);
       if (cancelled) return;
-      setState((current) => {
-        const merged = stored?.length
-          ? mergeImportedEntityRecords(current, stored as PersistedEntityRecord[])
-          : current;
-        auditBaseline.current = new Set(merged.events.map((event) => event.id));
-        return { ...merged, role: databaseRole };
+      const stored = recordsResult.data as PersistedEntityRecord[] | null;
+      const remoteProjects = projectsResult.data ?? [];
+      const baseState = stateRef.current;
+      const rememberedProjectId = activeProjectIdRef.current;
+      const loadedProjects: ImportedProject[] = remoteProjects.map((project) => {
+        const projectRows = (stored ?? []).filter((row) => row.project_id === project.id);
+        const merged = projectRows.length
+          ? mergeImportedEntityRecords(baseState, projectRows)
+          : mergeImportedWorkspace(baseState, snapshotImportedWorkspace({
+              ...createInitialDemoState([]),
+              activeWorkspace: "imported",
+              events: [],
+            }));
+        return {
+          id: project.id,
+          name: project.name,
+          description: project.description ?? "",
+          createdAt: project.created_at,
+          updatedAt: project.updated_at,
+          snapshot: snapshotImportedWorkspace(merged),
+        };
       });
+      const selected = loadedProjects.find((project) => project.id === rememberedProjectId) ?? loadedProjects[0];
+      setProjects(loadedProjects);
+      setActiveProjectId(selected?.id ?? "");
+      const merged = selected ? mergeImportedWorkspace(baseState, selected.snapshot) : baseState;
+      auditBaseline.current = new Set(merged.events.map((event) => event.id));
+      setState({ ...merged, role: databaseRole });
+      const loadError = recordsResult.error ?? projectsResult.error;
       setPersistence({
         configured: true,
         authenticated: true,
@@ -265,7 +385,7 @@ export function DemoWorkflowProvider({
   useEffect(() => {
     const client = getSupabaseBrowserClient();
     const identity = databaseUser.current;
-    if (!hydrated || !databaseReady || !client || !identity || persistence.mode !== "supabase") return;
+    if (!hydrated || !databaseReady || !client || !identity || persistence.mode !== "supabase" || !activeProjectId) return;
     if (remoteApplying.current) {
       remoteApplying.current = false;
       return;
@@ -273,6 +393,23 @@ export function DemoWorkflowProvider({
     const timer = window.setTimeout(() => {
       void (async () => {
         setPersistence((current) => ({ ...current, status: "saving", error: "" }));
+        const activeProject = projects.find((project) => project.id === activeProjectId);
+        if (activeProject && state.role !== "Auditor") {
+          const projectResult = await client.from("operational_projects").upsert({
+            id: activeProject.id,
+            organization_id: identity.organizationId,
+            name: activeProject.name,
+            description: activeProject.description,
+            status: "active",
+            created_by: identity.id,
+            created_at: activeProject.createdAt,
+            updated_at: activeProject.updatedAt,
+          }, { onConflict: "id" });
+          if (projectResult.error) {
+            setPersistence((current) => ({ ...current, status: "error", error: projectResult.error.message }));
+            return;
+          }
+        }
         const writable: Record<Role, string[] | null> = {
           Administrator: null,
           "Sales Manager": ["tier_calculation", "churn_calculation", "analysis", "signal", "alert", "response", "outcome", "action", "recommendation"],
@@ -287,6 +424,7 @@ export function DemoWorkflowProvider({
         const databaseRows = records.map((item) => ({
           organization_id: identity.organizationId,
           workspace: "imported",
+          project_id: activeProjectId,
           entity_type: item.entity_type,
           entity_key: item.entity_key,
           customer_external_id: item.customer_external_id,
@@ -302,7 +440,7 @@ export function DemoWorkflowProvider({
           if (!batch.length) continue;
           const result = await client.from("operational_entity_records").upsert(
             batch,
-            { onConflict: "organization_id,workspace,entity_type,entity_key" },
+            { onConflict: "organization_id,workspace,project_id,entity_type,entity_key" },
           );
           if (result.error) { error = result.error; break; }
         }
@@ -311,6 +449,7 @@ export function DemoWorkflowProvider({
           const { error: auditError } = await client.from("audit_logs").insert(
             newEvents.map((event) => ({
               organization_id: identity.organizationId,
+              project_id: activeProjectId,
               actor_id: identity.id,
               actor_label: event.actor,
               actor_role: event.role,
@@ -333,23 +472,24 @@ export function DemoWorkflowProvider({
       })();
     }, 700);
     return () => window.clearTimeout(timer);
-  }, [databaseReady, hydrated, persistence.mode, state]);
+  }, [activeProjectId, databaseReady, hydrated, persistence.mode, projects, state]);
 
   useEffect(() => {
     const client = getSupabaseBrowserClient();
-    if (!client || persistence.mode !== "supabase" || !databaseReady) return;
+    if (!client || persistence.mode !== "supabase" || !databaseReady || !activeProjectId) return;
     const channel = client
-      .channel("customerpulse-imported-workspace")
+      .channel(`customerpulse-imported-project-${activeProjectId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "operational_entity_records", filter: "workspace=eq.imported" },
+        { event: "*", schema: "public", table: "operational_entity_records", filter: `project_id=eq.${activeProjectId}` },
         (payload) => {
           const changed = payload.new as Record<string, unknown>;
           if (changed.updated_by === databaseUser.current?.id) return;
           void client
             .from("operational_entity_records")
-            .select("entity_type,entity_key,customer_external_id,data")
+            .select("project_id,entity_type,entity_key,customer_external_id,data")
             .eq("workspace", "imported")
+            .eq("project_id", activeProjectId)
             .order("created_at", { ascending: true })
             .then(({ data, error }) => {
               if (error || !data) return;
@@ -361,7 +501,7 @@ export function DemoWorkflowProvider({
       )
       .subscribe();
     return () => { void client.removeChannel(channel); };
-  }, [databaseReady, persistence.mode]);
+  }, [activeProjectId, databaseReady, persistence.mode]);
 
   const update = useCallback(
     (updater: (current: DemoWorkflowState) => DemoWorkflowState) =>
@@ -409,10 +549,12 @@ export function DemoWorkflowProvider({
 
   const addImport = useCallback(
     (result: ImportResult, type: string) => {
-      let summary!: ImportCommitSummary;
-      update((current) => {
-        if (!canUploadType(current.role, type))
-          throw new Error(`${current.role} cannot import ${type}`);
+      if (!activeProjectId)
+        return Promise.reject(new Error("Create or select an Imported Workspace project before uploading files"));
+      return new Promise<ImportCommitSummary>((resolve, reject) => update((current) => {
+        try {
+          if (!canUploadType(current.role, type))
+            throw new Error(`${current.role} cannot import ${type}`);
         const workspace: WorkspaceKind =
           current.activeWorkspace === "demo"
             ? "imported"
@@ -423,7 +565,7 @@ export function DemoWorkflowProvider({
           type as ImportResult["kind"],
           actorForRole(current.role),
         );
-        summary = committed.summary;
+        const summary = committed.summary;
         const id = "IMP-" + Date.now();
         const record = {
           id,
@@ -460,7 +602,7 @@ export function DemoWorkflowProvider({
                 sourceFileName: result.filename,
               }))
             : [];
-        return {
+        const next = {
           ...current,
           activeWorkspace: workspace,
           lastImportSummary: summary,
@@ -503,10 +645,15 @@ export function DemoWorkflowProvider({
             ...current.events,
           ],
         };
-      });
-      return summary;
+        queueMicrotask(() => resolve(summary));
+        return next;
+        } catch (error) {
+          queueMicrotask(() => reject(error));
+          return current;
+        }
+      }));
     },
-    [actorForRole, createEvent, update],
+    [activeProjectId, actorForRole, createEvent, update],
   );
 
   const createRecommendation = useCallback(
@@ -539,7 +686,7 @@ export function DemoWorkflowProvider({
         (item) => item.analysisId === analysis.id,
       );
       const types = new Set(signals.map((item) => item.type));
-      const action =
+      const fallbackAction =
         types.has("Cancellation intent") || types.has("Severe complaint")
           ? "Resolve validated service issues before any promotional outreach"
           : types.has("Price objection")
@@ -549,6 +696,7 @@ export function DemoWorkflowProvider({
             : customer.productGap
               ? `Offer a staff-led review of ${customer.productGap} using the approved catalogue`
               : "Complete an evidence-led customer follow-up";
+      const action = analysis.customerMessageDraft?.body || fallbackAction;
       const stableSeedId =
         state.activeWorkspace === "demo" && customerId === "CUS-1001"
           ? "REC-001"
@@ -567,7 +715,7 @@ export function DemoWorkflowProvider({
         customerId,
         analysisId: analysis.id,
         action,
-        explanation: analysis.summary,
+        explanation: analysis.customerMessageDraft?.rationale || analysis.summary,
         priority:
           calculation?.risk === "Critical"
             ? "Urgent"
@@ -577,7 +725,7 @@ export function DemoWorkflowProvider({
                 ? "Medium"
                 : "Low",
         status: "Draft",
-        channel: customer.preferredChannel,
+        channel: analysis.customerMessageDraft?.channel || customer.preferredChannel,
         confidence: `${analysis.confidence}%`,
         uncertainty:
           "This recommendation is a draft inference. Staff must validate current customer context and policy before submission.",
@@ -611,6 +759,163 @@ export function DemoWorkflowProvider({
     },
     [createEvent, persistence.actor, persistence.authenticated, state, update],
   );
+
+  const selectActionPlan = useCallback(
+    (customerId: string, plan: AVOActionPlan, owner: string, dueDate: string) => {
+      if (state.role !== "Administrator")
+        throw new Error("Only an Administrator can select an AVO action plan");
+      if (!owner.trim() || !dueDate)
+        throw new Error("Action owner and due date are required");
+      if (new Date(`${dueDate}T23:59:59`).getTime() < Date.now())
+        throw new Error("Due date cannot be in the past");
+      const customer = state.datasets[state.activeWorkspace].customers.find(
+        (item) => item.id === customerId,
+      );
+      if (!customer) throw new Error("Customer was not found");
+      const analysis = state.datasets[state.activeWorkspace].analyses.find(
+        (item) => item.customerId === customerId && item.actionPlans.some((candidate) => candidate.id === plan.id),
+      );
+      if (!analysis) throw new Error("The selected plan is not part of the stored AVO analysis");
+      const existing = state.actions.find(
+        (item) => item.sourceType === "AVO Action Plan" && item.customerId === customerId && item.selectedPlanId === plan.id && item.status !== "Cancelled",
+      );
+      if (existing) return existing;
+      const at = timestamp();
+      const action: RetentionActionRecord = {
+        id: `PLAN-ACT-${Date.now()}`,
+        datasetId: state.activeWorkspace,
+        sourceType: "AVO Action Plan",
+        recommendationId: analysis.id,
+        alertId: state.datasets[state.activeWorkspace].alerts.find(
+          (item) => item.customerId === customerId && item.status === "Active",
+        )?.id ?? "No active alert",
+        customerId,
+        customerName: customer.name,
+        tier: customer.tier,
+        risk: customer.risk,
+        recommendation: plan.title,
+        explanation: `${plan.description} ${plan.rationale}`,
+        priority: plan.priority,
+        actionType: plan.action_type,
+        owner: owner.trim(),
+        approver: actorForRole(state.role),
+        requester: actorForRole(state.role),
+        deadline: dueDate,
+        status: "In Progress",
+        approvalStatus: "Administrator selected",
+        executionStatus: "In Progress",
+        confidence: `${analysis.confidence}%`,
+        uncertainty: "AVO proposed this plan; a human remains responsible for execution and completion.",
+        evidence: plan.evidence_ids,
+        originalAvoOutput: plan.description,
+        humanEditedOutput: plan.description,
+        reviewerComment: "Selected by Administrator from three AVO action plans",
+        rejectionReason: "",
+        outcome: "",
+        customerResponse: "",
+        startedAt: at,
+        startedBy: actorForRole(state.role),
+        selectedPlanId: plan.id,
+        completionCriteria: plan.completion_criteria,
+        versions: [{ version: 1, content: plan.description, actor: actorForRole(state.role), at }],
+        history: [{ status: "In Progress", actor: actorForRole(state.role), role: state.role, comment: `AVO action plan selected; due ${dueDate}`, at }],
+      };
+      update((current) => ({
+        ...current,
+        actions: [action, ...current.actions],
+        events: [
+          createEvent(current, "AVO action plan selected", action.id, "In Progress", `${plan.id}; owner ${owner.trim()}; due ${dueDate}`),
+          ...current.events,
+        ],
+      }));
+      return action;
+    },
+    [actorForRole, createEvent, state, update],
+  );
+
+  const completeActionPlan = useCallback(
+    (actionId: string, notes: string) => {
+      if (state.role !== "Administrator")
+        throw new Error("Only an Administrator can complete an AVO action plan");
+      const action = state.actions.find((item) => item.id === actionId && item.sourceType === "AVO Action Plan");
+      if (!action) throw new Error("Action plan was not found");
+      if (!notes.trim()) throw new Error("Completion notes are required");
+      if (action.status === "Completed") return;
+      const at = timestamp();
+      update((current) => ({
+        ...current,
+        actions: current.actions.map((item) =>
+          item.id === actionId
+            ? {
+                ...item,
+                status: "Completed",
+                executionStatus: "Completed",
+                outcome: "Completed manually by Administrator",
+                completionNotes: notes.trim(),
+                completedAt: at,
+                history: [...item.history, { fromStatus: item.status, status: "Completed", actor: actorForRole(current.role), role: current.role, comment: notes.trim(), at }],
+              }
+            : item,
+        ),
+        events: [createEvent(current, "AVO action plan completed", actionId, "Completed", notes.trim()), ...current.events],
+      }));
+    },
+    [actorForRole, createEvent, state, update],
+  );
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const markOverdue = () =>
+      setState((current) => {
+        const today = new Date().toISOString().slice(0, 10);
+        const overdue = current.actions.filter(
+          (item) =>
+            item.sourceType === "AVO Action Plan" &&
+            item.status === "In Progress" &&
+            item.deadline < today,
+        );
+        if (!overdue.length) return current;
+        const at = timestamp();
+        return {
+          ...current,
+          actions: current.actions.map((item) =>
+            overdue.some((candidate) => candidate.id === item.id)
+              ? {
+                  ...item,
+                  status: "Not Completed" as const,
+                  executionStatus: "Not Completed",
+                  history: [
+                    ...item.history,
+                    {
+                      fromStatus: "In Progress",
+                      status: "Not Completed",
+                      actor: "CustomerPulse Scheduler",
+                      role: "Administrator",
+                      comment: `Due date ${item.deadline} passed without manual completion`,
+                      at,
+                    },
+                  ],
+                }
+              : item,
+          ),
+          events: [
+            ...overdue.map((item) =>
+              createEvent(
+                current,
+                "AVO action plan overdue",
+                item.id,
+                "Not Completed",
+                `In Progress -> Not Completed; due ${item.deadline}`,
+              ),
+            ),
+            ...current.events,
+          ],
+        };
+      });
+    markOverdue();
+    const timer = window.setInterval(markOverdue, 60_000);
+    return () => window.clearInterval(timer);
+  }, [createEvent, hydrated]);
 
   const submitRecommendation = useCallback(
     (
@@ -1468,6 +1773,67 @@ export function DemoWorkflowProvider({
     [createEvent, update],
   );
 
+  const createProject = useCallback(
+    (rawName: string, description = "") => {
+      const name = rawName.trim();
+      if (!name) throw new Error("Project name is required");
+      if (projects.some((project) => project.name.toLowerCase() === name.toLowerCase()))
+        throw new Error("A project with this name already exists");
+      const at = timestamp();
+      const blankState = {
+        ...createInitialDemoState([]),
+        activeWorkspace: "imported" as const,
+        role: state.role,
+        thresholds: state.thresholds,
+        events: [],
+      };
+      const project: ImportedProject = {
+        id: globalThis.crypto.randomUUID(),
+        name,
+        description: description.trim(),
+        createdAt: at,
+        updatedAt: at,
+        snapshot: snapshotImportedWorkspace(blankState),
+      };
+      setProjects((current) => [
+        project,
+        ...current.map((item) =>
+          item.id === activeProjectId && state.activeWorkspace === "imported"
+            ? { ...item, updatedAt: at, snapshot: snapshotImportedWorkspace(state) }
+            : item,
+        ),
+      ]);
+      setActiveProjectId(project.id);
+      setState((current) => ({
+        ...mergeImportedWorkspace(current, project.snapshot),
+        activeWorkspace: "imported",
+      }));
+      return project;
+    },
+    [activeProjectId, projects, state],
+  );
+
+  const switchProject = useCallback(
+    (projectId: string) => {
+      const target = projects.find((project) => project.id === projectId);
+      if (!target) throw new Error("Project was not found");
+      const at = timestamp();
+      setProjects((current) =>
+        current.map((project) =>
+          project.id === activeProjectId && state.activeWorkspace === "imported"
+            ? { ...project, updatedAt: at, snapshot: snapshotImportedWorkspace(state) }
+            : project,
+        ),
+      );
+      setActiveProjectId(projectId);
+      setState((current) => ({
+        ...mergeImportedWorkspace(current, target.snapshot),
+        activeWorkspace: "imported",
+      }));
+    },
+    [activeProjectId, projects, state],
+  );
+
   const value = useMemo<WorkflowContextValue>(
     () => ({
       state,
@@ -1507,6 +1873,11 @@ export function DemoWorkflowProvider({
             ? persistence.actor
             : undefined,
         ),
+      projects,
+      activeProjectId,
+      activeProject: projects.find((project) => project.id === activeProjectId),
+      createProject,
+      switchProject,
       switchWorkspace: (workspace) =>
         update((current) => ({
           ...current,
@@ -1541,6 +1912,8 @@ export function DemoWorkflowProvider({
       recordOutcome,
       storeAnalysis,
       createRecommendation,
+      selectActionPlan,
+      completeActionPlan,
       recalculate,
       updateCampaign,
       openCampaignFromOpportunity,
@@ -1588,12 +1961,18 @@ export function DemoWorkflowProvider({
       recordOutcome,
       storeAnalysis,
       createRecommendation,
+      selectActionPlan,
+      completeActionPlan,
       recalculate,
       updateCampaign,
       openCampaignFromOpportunity,
       selectCampaign,
       setOpportunityStatus,
       addScheduledPosts,
+      projects,
+      activeProjectId,
+      createProject,
+      switchProject,
     ],
   );
 

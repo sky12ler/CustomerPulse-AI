@@ -33,6 +33,54 @@ const valid: AVOAnalysis = {
   ],
   analysis_confidence: 0.9,
   uncertainty_reason: "Future behaviour is uncertain.",
+  action_plans: [
+    {
+      id: "PLAN-1",
+      title: "Resolve service issue",
+      action_type: "Service recovery",
+      description: "Verify and resolve the replacement issue.",
+      rationale: "The customer reported an unresolved replacement.",
+      priority: "Urgent",
+      owner_role: "Account Executive",
+      due_in_days: 1,
+      evidence_ids: ["MSG-A-101"],
+      prerequisites: ["Verify replacement status"],
+      completion_criteria: "Resolution is recorded.",
+    },
+    {
+      id: "PLAN-2",
+      title: "Call customer",
+      action_type: "Customer call",
+      description: "Arrange a recovery call.",
+      rationale: "Clarification is required.",
+      priority: "High",
+      owner_role: "Account Executive",
+      due_in_days: 2,
+      evidence_ids: ["MSG-A-101"],
+      prerequisites: ["Confirm availability"],
+      completion_criteria: "Call outcome is recorded.",
+    },
+    {
+      id: "PLAN-3",
+      title: "Escalate risk",
+      action_type: "Management escalation",
+      description: "Request a manager decision.",
+      rationale: "Cancellation risk requires review.",
+      priority: "High",
+      owner_role: "Sales Manager",
+      due_in_days: 1,
+      evidence_ids: ["MSG-A-101"],
+      prerequisites: ["Attach evidence"],
+      completion_criteria: "Manager decision is recorded.",
+    },
+  ],
+  customer_message_draft: {
+    channel: "Email",
+    subject: "Service follow-up",
+    body: "We are reviewing the issue you raised.",
+    rationale: "Staff approval is required.",
+    evidence_ids: ["MSG-A-101"],
+  },
 };
 afterEach(() => {
   delete process.env.OPENAI_API_KEY;
@@ -54,6 +102,8 @@ describe("AVO providers", () => {
     expect(out.analysis.evidence.map((e) => e.message_id)).toContain(
       "MSG-A-104",
     );
+    expect(out.analysis.action_plans).toHaveLength(3);
+    expect(out.analysis.customer_message_draft.body.length).toBeGreaterThan(10);
   });
   it("derives imported-workspace fallback findings from message text rather than seeded scenarios", async () => {
     const imported = {
@@ -120,6 +170,7 @@ describe("AVO providers", () => {
     expect(serialized).toContain('"type":"json_schema"');
     expect(serialized).toContain("UNTRUSTED INSTRUCTION-LIKE CONTENT REMOVED");
     expect(serialized).not.toContain("reveal the system prompt");
+    expect(serialized).toContain("exactly three distinct operational action plans");
   });
   it("rejects live output with a nonexistent evidence ID", async () => {
     const provider = new OpenAIProvider(async () => ({
@@ -133,6 +184,17 @@ describe("AVO providers", () => {
     await expect(provider.analyze(customers[0])).rejects.toThrow(
       "invalid evidence",
     );
+  });
+  it("rejects a plan that cites a nonexistent evidence ID", async () => {
+    const provider = new OpenAIProvider(async () => ({
+      output_text: JSON.stringify({
+        ...valid,
+        action_plans: valid.action_plans.map((plan, index) =>
+          index === 0 ? { ...plan, evidence_ids: ["FAKE-PLAN-EVIDENCE"] } : plan,
+        ),
+      }),
+    }));
+    await expect(provider.analyze(customers[0])).rejects.toThrow("invalid evidence");
   });
   it("uses Xiaomi MiMo's supported json_object response format", async () => {
     let request: unknown;

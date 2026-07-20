@@ -1,5 +1,6 @@
 import type { Customer, Risk, Sentiment, Tier } from "./types";
 import type { ImportKind, ImportResult } from "./imports";
+import type { AVOActionPlan } from "./avo";
 export type WorkspaceKind = "demo" | "imported";
 export type SourceType =
   | "Demo Seed"
@@ -96,6 +97,14 @@ export interface StoredAnalysis extends Provenance {
   summary: string;
   confidence: number;
   evidenceIds: string[];
+  actionPlans: AVOActionPlan[];
+  customerMessageDraft: {
+    channel: "Email" | "WhatsApp";
+    subject: string;
+    body: string;
+    rationale: string;
+    evidence_ids: string[];
+  };
   createdAt: string;
 }
 export interface OperationalProduct extends Provenance {
@@ -898,6 +907,8 @@ export function signalsFromAnalysis(
     analysis_confidence?: number;
     evidence?: Array<{ messageId?: string; message_id?: string }>;
     evidenceIds?: string[];
+    action_plans?: AVOActionPlan[];
+    customer_message_draft?: StoredAnalysis["customerMessageDraft"];
   },
 ) {
   const customer = dataset.customers.find((item) => item.id === customerId);
@@ -960,6 +971,14 @@ export function signalsFromAnalysis(
       "Structured conversation analysis",
     confidence,
     evidenceIds: supplied,
+    actionPlans: analysis.action_plans ?? [],
+    customerMessageDraft: analysis.customer_message_draft ?? {
+      channel: customer.preferredChannel === "WhatsApp" ? "WhatsApp" : "Email",
+      subject: "Customer follow-up",
+      body: "An authorised staff member will confirm the next step after review.",
+      rationale: "Fallback draft created for an older analysis record.",
+      evidence_ids: supplied,
+    },
     createdAt: now(),
   };
   let next = {

@@ -26,6 +26,14 @@ const workspaceSql = readFileSync(
   "utf8",
 ).toLowerCase();
 
+const projectsSql = readFileSync(
+  path.join(
+    process.cwd(),
+    "supabase/migrations/202607200004_imported_projects.sql",
+  ),
+  "utf8",
+).toLowerCase();
+
 const requiredTables = [
   "organizations",
   "profiles",
@@ -115,5 +123,13 @@ describe("Supabase security migration", () => {
     expect(workspaceSql).not.toMatch(/on public\.audit_logs\s+for (update|delete)/);
     expect(workspaceSql).toContain("handle_customerpulse_user");
     expect(workspaceSql).toContain("'account_executive'");
+  });
+
+  it("isolates imported records and original files by user-created project", () => {
+    expect(projectsSql).toContain("create table if not exists public.operational_projects");
+    expect(projectsSql).toContain("add column if not exists project_id");
+    expect(projectsSql).toContain("organization_id, workspace, project_id, entity_type, entity_key");
+    expect(projectsSql).toContain("'imported-project-files'");
+    expect(projectsSql).toContain("storage.foldername(name)");
   });
 });

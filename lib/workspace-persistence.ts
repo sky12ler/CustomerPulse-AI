@@ -25,6 +25,7 @@ import type {
 export const WORKSPACE_SNAPSHOT_VERSION = 1;
 
 export interface PersistedEntityRecord {
+  project_id?: string;
   entity_type: string;
   entity_key: string;
   customer_external_id: string | null;

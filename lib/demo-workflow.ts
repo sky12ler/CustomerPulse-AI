@@ -19,6 +19,7 @@ export type ActionStatus =
   | "Waiting for Customer"
   | "Outcome Required"
   | "Completed"
+  | "Not Completed"
   | "Cancelled";
 
 export type CampaignStatus =
@@ -136,6 +137,9 @@ export interface RetentionActionRecord {
   responseExpected?: boolean;
   responseDeadline?: string;
   completedAt?: string;
+  selectedPlanId?: string;
+  completionCriteria?: string;
+  completionNotes?: string;
   versions: Array<{
     version: number;
     content: string;

@@ -48,6 +48,7 @@ import type { AVOAnalysis } from "@/lib/avo";
 import type { AvoChatContext } from "@/lib/avo-chat";
 import type { Customer, Role } from "@/lib/types";
 import type { ImportResult } from "@/lib/imports";
+import { downloadImportedFile, storeImportedFile } from "@/lib/import-file-store";
 import {
   DemoWorkflowProvider,
   useDemoWorkflow,
@@ -82,6 +83,7 @@ const nav = [
     [
       ["avo", "AVO", Bot],
       ["recommendations", "Recommendations", Sparkles],
+      ["action-plans", "Action Plans", Target],
       ["actions", "Retention Actions", ClipboardCheck],
     ],
   ],
@@ -129,6 +131,10 @@ const titles: Record<string, [string, string]> = {
     "AVO Recommendations",
     "Evidence-backed next actions awaiting human judgment.",
   ],
+  "action-plans": [
+    "Action Plans",
+    "Track Administrator-selected AVO plans, owners, due dates and completion.",
+  ],
   actions: [
     "Retention Actions",
     "Review, approve and execute governed customer outreach.",
@@ -172,6 +178,7 @@ const accessByRole: Record<Role, string[]> = {
     "imports",
     "avo",
     "recommendations",
+    "action-plans",
     "actions",
     "analytics",
     "governance",
@@ -198,6 +205,7 @@ const accessByRole: Record<Role, string[]> = {
     "imports",
     "avo",
     "recommendations",
+    "action-plans",
     "actions",
     "audit",
   ],
@@ -207,6 +215,7 @@ const accessByRole: Record<Role, string[]> = {
     "customers",
     "conversations",
     "recommendations",
+    "action-plans",
     "actions",
     "marketing",
     "campaign-calendar",
@@ -221,6 +230,7 @@ const requiredRoles: Record<string, string> = {
   "campaign-studio": "Administrator or Marketing Manager",
   "campaign-calendar": "Administrator, Marketing Manager, or Auditor",
   settings: "Administrator",
+  "action-plans": "Administrator to select or complete; authorised staff may view",
 };
 const money = (n: number) =>
   new Intl.NumberFormat("en-MY", {
@@ -228,6 +238,8 @@ const money = (n: number) =>
     currency: "MYR",
     maximumFractionDigits: 0,
   }).format(n);
+const dateAfterDays = (days: number) =>
+  new Date(new Date().getTime() + days * 86400000).toISOString().slice(0, 10);
 const badge = (value: string) => (
   <span className={`badge ${value.toLowerCase().replaceAll(" ", "-")}`}>
     {value}
@@ -290,6 +302,8 @@ function DashboardInner({ initialPage }: { initialPage: string }) {
   );
   const [toast, setToast] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [projectCreatorOpen, setProjectCreatorOpen] = useState(false);
+  const [projectName, setProjectName] = useState("");
   const [locationVersion, setLocationVersion] = useState(0);
   const [serviceHealth, setServiceHealth] = useState({ avoProvider: "demo", publisher: "demo" });
 
@@ -323,6 +337,16 @@ function DashboardInner({ initialPage }: { initialPage: string }) {
   const notify = (message: string) => {
     setToast(message);
     setTimeout(() => setToast(""), 4200);
+  };
+  const createNamedProject = () => {
+    try {
+      const project = demo.createProject(projectName);
+      setProjectName("");
+      setProjectCreatorOpen(false);
+      notify(`${project.name} created. Uploads will be isolated to this project.`);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Project creation failed");
+    }
   };
   const legacyAction = state.actions.find((item) => item.id === "ACT-021");
   const authorizedCustomerIds = new Set(
@@ -442,6 +466,55 @@ function DashboardInner({ initialPage }: { initialPage: string }) {
                 <option value="demo">Demo Workspace</option>
                 <option value="imported">Imported Workspace</option>
               </select>
+              {state.activeWorkspace === "imported" && (
+                <>
+                  <select
+                    aria-label="Active imported project"
+                    className="input"
+                    value={demo.activeProjectId}
+                    onChange={(event) => {
+                      if (event.target.value) {
+                        demo.switchProject(event.target.value);
+                        notify("Imported project switched. All operational views now use the selected project.");
+                      }
+                    }}
+                  >
+                    <option value="">Select a project</option>
+                    {demo.projects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => setProjectCreatorOpen((current) => !current)}
+                  >
+                    New Project
+                  </button>
+                  {projectCreatorOpen && (
+                    <>
+                      <input
+                        aria-label="New project name"
+                        className="input"
+                        value={projectName}
+                        onChange={(event) => setProjectName(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") createNamedProject();
+                        }}
+                        placeholder="Project name"
+                        autoFocus
+                      />
+                      <button className="btn btn-primary" onClick={createNamedProject} disabled={!projectName.trim()}>
+                        Create
+                      </button>
+                      <button className="btn btn-outline" onClick={() => { setProjectCreatorOpen(false); setProjectName(""); }}>
+                        Cancel
+                      </button>
+                    </>
+                  )}
+                </>
+              )}
               <button
                 className="btn btn-outline"
                 onClick={() => {
@@ -572,6 +645,8 @@ function Page({
       return <AVOChat notify={notify} />;
     case "recommendations":
       return <RecommendationsV2 notify={notify} go={go} />;
+    case "action-plans":
+      return <ActionPlans notify={notify} go={go} />;
     case "actions":
       return <ActionsV2 notify={notify} role={role} go={go} />;
     case "marketing":
@@ -593,6 +668,118 @@ function Page({
   }
 }
 
+function ActionPlans({
+  notify,
+  go,
+}: {
+  notify: (message: string) => void;
+  go: (path: string) => void;
+}) {
+  const demo = useDemoWorkflow();
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const visibleCustomers = new Set(demo.accessibleCustomers.map((item) => item.id));
+  const [today] = useState(() => new Date().toISOString().slice(0, 10));
+  const inThreeDays = dateAfterDays(3);
+  const plans = demo.state.actions
+    .filter(
+      (item) =>
+        item.datasetId === demo.state.activeWorkspace &&
+        item.sourceType === "AVO Action Plan" &&
+        visibleCustomers.has(item.customerId),
+    )
+    .sort((a, b) => {
+      const completeDifference = Number(a.status === "Completed") - Number(b.status === "Completed");
+      return completeDifference || a.deadline.localeCompare(b.deadline);
+    });
+  const overdue = plans.filter((item) => item.status === "Not Completed");
+  const dueSoon = plans.filter(
+    (item) => item.status === "In Progress" && item.deadline >= today && item.deadline <= inThreeDays,
+  );
+  const complete = (actionId: string) => {
+    try {
+      demo.completeActionPlan(actionId, notes[actionId] ?? "");
+      setNotes((current) => ({ ...current, [actionId]: "" }));
+      notify("Action plan marked Completed and added to the project audit history.");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Completion failed");
+    }
+  };
+  return (
+    <div>
+      <div className="grid three" style={{ marginBottom: 16 }}>
+        <Metric label="Tracked plans" value={String(plans.length)} />
+        <Metric label="Due within 3 days" value={String(dueSoon.length)} />
+        <Metric label="Not completed" value={String(overdue.length)} />
+      </div>
+      {(overdue.length > 0 || dueSoon.length > 0) && (
+        <div className={`notice ${overdue.length ? "danger" : "warning"}`} style={{ marginBottom: 16 }}>
+          <strong>Administrator reminder:</strong> {overdue.length} overdue plan(s) are Not Completed and {dueSoon.length} plan(s) are due within three days.
+        </div>
+      )}
+      {!plans.length ? (
+        <div className="card empty">
+          <Target size={34} />
+          <h2>No selected action plans</h2>
+          <p>Run AVO Analysis for a customer, compare its three plans, then select one as Administrator.</p>
+          <button className="btn btn-primary" onClick={() => go("conversations")}>Open Conversations</button>
+        </div>
+      ) : (
+        <div className="grid two">
+          {plans.map((plan) => (
+            <section className="card" key={plan.id}>
+              <div className="card-head">
+                <div>
+                  <h2>{plan.recommendation}</h2>
+                  <p className="subtle">{plan.customerName} Â· {plan.actionType}</p>
+                </div>
+                {badge(plan.status)}
+              </div>
+              <p>{plan.explanation}</p>
+              <div className="grid two">
+                <div className="evidence"><strong>Owner</strong><div>{plan.owner}</div></div>
+                <div className="evidence"><strong>Due date</strong><div>{plan.deadline}</div></div>
+              </div>
+              <div className="notice" style={{ marginTop: 10 }}>
+                <strong>Completion criteria</strong>
+                <div>{plan.completionCriteria}</div>
+              </div>
+              {plan.status === "Not Completed" && (
+                <div className="notice danger" style={{ marginTop: 10 }}>
+                  The due date passed before an Administrator recorded completion.
+                </div>
+              )}
+              {plan.completionNotes && (
+                <div className="notice success" style={{ marginTop: 10 }}>
+                  <strong>Completion notes</strong><div>{plan.completionNotes}</div>
+                </div>
+              )}
+              <div className="top-actions" style={{ marginTop: 12 }}>
+                <a className="btn btn-outline" href={`/customers/${plan.customerId}?tab=overview`}>
+                  View Customer
+                </a>
+                {(plan.status === "In Progress" || plan.status === "Not Completed") && demo.state.role === "Administrator" && (
+                  <>
+                    <input
+                      aria-label={`Completion notes for ${plan.recommendation}`}
+                      className="input"
+                      value={notes[plan.id] ?? ""}
+                      onChange={(event) => setNotes((current) => ({ ...current, [plan.id]: event.target.value }))}
+                      placeholder="Required completion notes"
+                    />
+                    <button className="btn btn-primary" onClick={() => complete(plan.id)}>
+                      Mark Completed
+                    </button>
+                  </>
+                )}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Overview({ go }: { go: (p: string) => void }) {
   const demo = useDemoWorkflow();
   const customers = demo.accessibleCustomers;
@@ -604,7 +791,7 @@ function Overview({ go }: { go: (p: string) => void }) {
     (action) => action.datasetId === demo.state.activeWorkspace && visibleIds.has(action.customerId),
   );
   const requiresAction = visibleActions.filter((action) =>
-    ["Pending Approval", "Changes Requested", "Approved and Ready", "In Progress", "Waiting for Customer", "Outcome Required"].includes(action.status),
+    ["Pending Approval", "Changes Requested", "Approved and Ready", "In Progress", "Waiting for Customer", "Outcome Required", "Not Completed"].includes(action.status),
   );
   const pendingRetention = visibleActions.filter((action) => action.status === "Pending Approval").length;
   const pendingCampaigns = demo.state.campaigns.filter((campaign) => campaign.datasetId === demo.state.activeWorkspace && campaign.status === "Pending Approval").length;
@@ -1859,7 +2046,12 @@ function AnalysisPanel({
 }) {
   const demo = useDemoWorkflow();
   const [createdId, setCreatedId] = useState("");
-  const generate = () => {
+  const [selectedPlanId, setSelectedPlanId] = useState("");
+  const customer = demo.dataset.customers.find((item) => item.id === customerId);
+  const [planOwner, setPlanOwner] = useState(customer?.staff ?? "");
+  const [planDueDate, setPlanDueDate] = useState("");
+  const [createdActionId, setCreatedActionId] = useState("");
+  const generateMessage = () => {
     try {
       const recommendation = demo.createRecommendation(customerId);
       setCreatedId(recommendation.id);
@@ -1868,6 +2060,25 @@ function AnalysisPanel({
       );
     } catch (error) {
       notify(error instanceof Error ? error.message : "Recommendation creation failed");
+    }
+  };
+  const choosePlan = (plan: AVOAnalysis["action_plans"][number]) => {
+    setSelectedPlanId(plan.id);
+    setPlanOwner(customer?.staff ?? "");
+    setPlanDueDate(
+      dateAfterDays(plan.due_in_days),
+    );
+    setCreatedActionId("");
+  };
+  const assignPlan = () => {
+    const plan = a.action_plans.find((item) => item.id === selectedPlanId);
+    if (!plan) return notify("Select an action plan first");
+    try {
+      const action = demo.selectActionPlan(customerId, plan, planOwner, planDueDate);
+      setCreatedActionId(action.id);
+      notify(`${plan.title} assigned to ${action.owner}; due ${action.deadline}`);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Action-plan assignment failed");
     }
   };
   return (
@@ -1911,12 +2122,68 @@ function AnalysisPanel({
         <strong>Uncertainty</strong>
         <div>{a.uncertainty_reason}</div>
       </div>
+      <div className="divider" />
+      <h3>Choose one of three AVO action plans</h3>
+      <p className="subtle">
+        A plan becomes a tracked task only after an Administrator selects it,
+        assigns an owner and confirms a due date.
+      </p>
+      <div style={{ display: "grid", gap: 10 }}>
+        {a.action_plans.map((plan, index) => (
+          <div className="evidence" key={plan.id}>
+            <div className="split">
+              <strong>{index + 1}. {plan.title}</strong>
+              {badge(plan.priority)}
+            </div>
+            <p>{plan.description}</p>
+            <p className="subtle"><b>Why:</b> {plan.rationale}</p>
+            <p className="subtle"><b>Complete when:</b> {plan.completion_criteria}</p>
+            <button
+              className={selectedPlanId === plan.id ? "btn btn-primary" : "btn btn-outline"}
+              onClick={() => choosePlan(plan)}
+              disabled={demo.state.role !== "Administrator"}
+              title={demo.state.role !== "Administrator" ? "Administrator selection required" : ""}
+            >
+              {selectedPlanId === plan.id ? "Selected" : "Choose this plan"}
+            </button>
+          </div>
+        ))}
+      </div>
+      {selectedPlanId && (
+        <div className="notice" style={{ marginTop: 10 }}>
+          <div className="grid two">
+            <label className="field">
+              <span>Action owner</span>
+              <input className="input" value={planOwner} onChange={(event) => setPlanOwner(event.target.value)} />
+            </label>
+            <label className="field">
+              <span>Due date</span>
+              <input className="input" type="date" value={planDueDate} onChange={(event) => setPlanDueDate(event.target.value)} />
+            </label>
+          </div>
+          <button className="btn btn-primary" onClick={assignPlan}>
+            Assign and track action plan
+          </button>
+          {createdActionId && (
+            <a className="btn btn-outline" href={`/action-plans?actionId=${encodeURIComponent(createdActionId)}`} style={{ marginLeft: 8 }}>
+              Open Action Plan
+            </a>
+          )}
+        </div>
+      )}
+      <div className="divider" />
+      <h3>4. Customer message draft</h3>
+      <div className="evidence">
+        <div className="split"><strong>{a.customer_message_draft.channel}</strong><span>{a.customer_message_draft.subject}</span></div>
+        <p>{a.customer_message_draft.body}</p>
+        <p className="subtle">{a.customer_message_draft.rationale}</p>
+      </div>
       <button
         className="btn btn-primary"
         style={{ width: "100%", marginTop: 12 }}
-        onClick={generate}
+        onClick={generateMessage}
       >
-        {createdId ? "Recommendation Created" : "Generate AVO Recommendation"}
+        {createdId ? "Message Recommendation Created" : "Create message recommendation for approval"}
       </button>
       {createdId && (
         <a
@@ -1944,16 +2211,23 @@ function Imports({ notify }: { notify: (s: string) => void }) {
   const [error, setError] = useState("");
   const [successId, setSuccessId] = useState("");
   const [quickSummary, setQuickSummary] = useState("");
+  const [newProjectName, setNewProjectName] = useState("");
   const allowed = canImport(role, kind);
   const option = importOptions[kind];
+  const projectReady = Boolean(demo.activeProjectId);
 
   async function quickImport(files: FileList | null) {
     if (!files?.length) return;
+    if (!projectReady) {
+      setError("Create or select a project before importing files.");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
+      const selectedFiles = Array.from(files);
       const validated: ImportResult[] = [];
-      for (const selected of Array.from(files)) {
+      for (const selected of selectedFiles) {
         const form = new FormData();
         form.set("file", selected);
         const response = await fetch("/api/imports/validate", {
@@ -1988,13 +2262,18 @@ function Imports({ notify }: { notify: (s: string) => void }) {
         updated = 0,
         rejected = 0,
         affected = 0;
-      validated.forEach((item) => {
-        const summary = demo.addImport(item, item.kind);
+      for (const item of validated) {
+        const original = selectedFiles.find((selected) => selected.name === item.filename);
+        if (original) {
+          item.storedFileKey = await storeImportedFile(demo.activeProjectId, original);
+          item.originalMimeType = original.type;
+        }
+        const summary = await demo.addImport(item, item.kind);
         added += summary.added;
         updated += summary.updated;
         rejected += summary.rejected;
         affected += summary.affectedCustomerIds.length;
-      });
+      }
       setQuickSummary(
         `${validated.length} files · ${added} added · ${updated} updated · ${rejected} rejected · ${affected} affected customer references`,
       );
@@ -2050,6 +2329,8 @@ function Imports({ notify }: { notify: (s: string) => void }) {
 
   const pick = (selected?: File) => {
     if (!selected) return;
+    if (!projectReady)
+      return setError("Create or select a project before importing files.");
     if (!allowed)
       return setError(
         `${role} cannot upload ${option.label}. ${option.roles} required.`,
@@ -2075,10 +2356,15 @@ function Imports({ notify }: { notify: (s: string) => void }) {
       "text/csv",
     );
   };
-  const confirm = () => {
+  const confirm = async () => {
     if (!result?.valid)
       return setError("Resolve validation errors before confirmation.");
-    const summary = demo.addImport(result, kind);
+    const committedResult = { ...result };
+    if (file) {
+      committedResult.storedFileKey = await storeImportedFile(demo.activeProjectId, file);
+      committedResult.originalMimeType = file.type;
+    }
+    const summary = await demo.addImport(committedResult, kind);
     setSuccessId(
       `${summary.added} added · ${summary.updated} updated · ${summary.affectedCustomerIds.length} affected customers`,
     );
@@ -2168,7 +2454,8 @@ function Imports({ notify }: { notify: (s: string) => void }) {
           <div>
             <h2>Operational data readiness</h2>
             <p className="subtle">
-              Workspace: <b>{demo.state.activeWorkspace}</b>. Customer and
+              Workspace: <b>{demo.state.activeWorkspace}</b>
+              {demo.activeProject ? <> Â· Project: <b>{demo.activeProject.name}</b></> : null}. Customer and
               transaction data support behavioural scoring; conversations and
               documents are optional enrichments.
             </p>
@@ -2217,6 +2504,42 @@ function Imports({ notify }: { notify: (s: string) => void }) {
           suggestions. Basic churn calculation remains available.
         </p>
       </section>
+      {!projectReady && (
+        <section className="card" style={{ marginBottom: 16 }}>
+          <div className="empty">
+            <Database size={34} />
+            <h2>Create your first imported project</h2>
+            <p>
+              Every project has isolated customers, conversations, calculations,
+              documents, recommendations, campaigns, analytics and audit history.
+            </p>
+            <div className="top-actions">
+              <input
+                aria-label="Project name"
+                className="input"
+                value={newProjectName}
+                onChange={(event) => setNewProjectName(event.target.value)}
+                placeholder="Example: July Retention Review"
+              />
+              <button
+                className="btn btn-primary"
+                disabled={!newProjectName.trim()}
+                onClick={() => {
+                  try {
+                    const project = demo.createProject(newProjectName);
+                    setNewProjectName("");
+                    notify(`${project.name} created. You can now upload its files.`);
+                  } catch (caught) {
+                    notify(caught instanceof Error ? caught.message : "Project creation failed");
+                  }
+                }}
+              >
+                Create Project
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
       <section className="card">
         <div className="card-head">
           <div>
@@ -2233,7 +2556,7 @@ function Imports({ notify }: { notify: (s: string) => void }) {
               type="file"
               multiple
               hidden
-              disabled={loading}
+              disabled={loading || !projectReady}
               onChange={(e) => quickImport(e.target.files)}
             />
           </label>
@@ -2695,15 +3018,50 @@ function PreviewRows({ result }: { result: ImportResult }) {
   );
 }
 function ImportHistory() {
-  const { state } = useDemoWorkflow();
+  const { state, activeProject } = useDemoWorkflow();
+  const [view, setView] = useState("imports");
+  const kinds = ["imports", "customers", "transactions", "conversations", "products", "documents"];
+  const documentKinds = new Set([
+    "retention_playbook",
+    "customer_service_policy",
+    "marketing_guidelines",
+    "product_catalogue",
+    "document",
+  ]);
+  const selectedImports = state.imports.filter((item) =>
+    view === "imports"
+      ? true
+      : view === "documents"
+        ? documentKinds.has(item.type)
+        : item.type === view,
+  );
+  const rows: Array<Record<string, unknown>> = selectedImports.flatMap((item) =>
+    (item.result.records ?? item.result.preview).map((record) => ({
+      _source_file: item.filename,
+      ...record,
+    })),
+  );
+  const columns = [...new Set(rows.flatMap((row) => Object.keys(row)))].slice(0, 8);
   return (
     <div className="card">
-      <h2>Import History</h2>
+      <div className="card-head">
+        <div>
+          <h2>Project Data Library</h2>
+          <p className="subtle">{activeProject?.name ?? "No project selected"}</p>
+        </div>
+        <div className="top-actions">
+          {kinds.map((kind) => (
+            <button key={kind} className={view === kind ? "btn btn-primary" : "btn btn-outline"} onClick={() => setView(kind)}>
+              {kind.replace(/^./, (letter) => letter.toUpperCase())}
+            </button>
+          ))}
+        </div>
+      </div>
       {state.imports.length === 0 ? (
         <div className="empty">
           <p>No confirmed imports in this demo session.</p>
         </div>
-      ) : (
+      ) : view === "imports" ? (
         state.imports.map((item) => (
           <div className="evidence" key={item.id}>
             <div className="split">
@@ -2717,8 +3075,58 @@ function ImportHistory() {
               {item.recordsAdded} added · {item.recordsRejected} rejected ·{" "}
               {item.uploader}
             </small>
+            {item.result.storedFileKey && (
+              <button
+                className="btn btn-outline"
+                style={{ marginTop: 8 }}
+                onClick={() => void downloadImportedFile(item.result.storedFileKey!, item.filename)}
+              >
+                <Download size={13} /> Download original file
+              </button>
+            )}
           </div>
         ))
+      ) : view === "documents" ? (
+        selectedImports.length ? selectedImports.map((item) => (
+          <div className="evidence" key={item.id}>
+            <div className="split"><strong>{item.filename}</strong>{badge(item.type.replaceAll("_", " "))}</div>
+            <div className="subtle">{item.result.pages ?? item.result.validCount} page(s) Â· {item.result.chunks?.length ?? 0} searchable chunk(s)</div>
+            <details style={{ marginTop: 8 }}>
+              <summary>View extracted document content</summary>
+              <pre style={{ whiteSpace: "pre-wrap", maxHeight: 280, overflow: "auto" }}>{item.result.extractedText || "No extracted text stored"}</pre>
+            </details>
+            <div className="top-actions" style={{ marginTop: 8 }}>
+              {item.result.storedFileKey && (
+                <button className="btn btn-primary" onClick={() => void downloadImportedFile(item.result.storedFileKey!, item.filename)}>
+                  <Download size={13} /> Download original PDF
+                </button>
+              )}
+              <button className="btn btn-outline" onClick={() => downloadText(`${item.filename}-extracted.txt`, item.result.extractedText ?? "")}>
+                Export extracted text
+              </button>
+            </div>
+          </div>
+        )) : <div className="empty">No imported documents in this project.</div>
+      ) : rows.length ? (
+        <>
+          <div className="split" style={{ marginBottom: 8 }}>
+            <span>{rows.length} imported row(s)</span>
+            <button className="btn btn-outline" onClick={() => downloadText(`${activeProject?.name ?? "project"}-${view}.json`, JSON.stringify(rows, null, 2), "application/json")}>Export visible data</button>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead>
+              <tbody>
+                {rows.slice(0, 50).map((row, index) => (
+                  <tr key={index}>{columns.map((column) => <td key={column}>{String(row[column] ?? "")}</td>)}</tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {rows.length > 50 && <p className="validation-help">Showing the first 50 rows. Export includes all {rows.length} rows.</p>}
+        </>
+      ) : (
+        <div className="empty">No {view} records imported into this project.</div>
       )}
     </div>
   );

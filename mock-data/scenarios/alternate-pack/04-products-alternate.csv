@@ -1,0 +1,6 @@
+product_sku,product_name,category,description,standard_price,promotion_price,promotion_start,promotion_end,inventory_status,product_url
+ALT-PRD-101,Care Operations Platform,Software,"Workflow coordination and operational reporting for approved healthcare teams.",24000,,,,available,https://example.invalid/products/care-operations
+ALT-PRD-102,Clinical Analytics Review,Service,"Staff-led review of approved operational analytics; no clinical diagnosis or outcome guarantee.",18000,,,,available,https://example.invalid/products/analytics-review
+ALT-PRD-103,Compliance Archive,Software,"Retention-controlled document archive with role-based access and audit history.",12000,,,,available,https://example.invalid/products/compliance-archive
+ALT-PRD-104,CareConnect Portal,Software,"Customer portal for approved service updates, requests and account communications.",16000,,,,available,https://example.invalid/products/careconnect
+ALT-PRD-105,Priority Recovery Support,Service,"Escalation coordination under the approved service policy; resolution times are not guaranteed.",20000,,,,limited,https://example.invalid/products/recovery-support

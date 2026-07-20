@@ -10,11 +10,20 @@ async function reset(
   selectedRole = "Administrator",
 ) {
   await page.goto(route);
-  await page.evaluate(() => localStorage.removeItem("customerpulse-demo-v2"));
+  await page.evaluate(() => {
+    localStorage.removeItem("customerpulse-demo-v2");
+    localStorage.removeItem("customerpulse-imported-projects-v1");
+  });
   await page.reload();
   await role(page, selectedRole);
 }
 async function confirmedImport(page: Page, kind: string, file: string) {
+  if ((await page.getByLabel("Active workspace").inputValue()) !== "imported")
+    await page.getByLabel("Active workspace").selectOption("imported");
+  if (!(await page.getByLabel("Active imported project").inputValue())) {
+    await page.getByLabel("Project name").fill("Production Acceptance Project");
+    await page.getByRole("button", { name: "Create Project", exact: true }).click();
+  }
   await page.getByLabel("Import type").selectOption(kind);
   await page.getByRole("button", { name: "Continue" }).click();
   const validation = page.waitForResponse(
@@ -89,7 +98,7 @@ test("Production acceptance B — Maya analysis through recorded outcome and aud
   await page.getByRole("button", { name: "Run AVO Analysis" }).click();
   expect((await reanalysis).ok()).toBe(true);
   await page
-    .getByRole("button", { name: "Generate AVO Recommendation" })
+    .getByRole("button", { name: "Create message recommendation for approval" })
     .click();
   await page.getByRole("link", { name: "Recommendations" }).click();
   await page.getByRole("button", { name: "Submit for Approval" }).click();

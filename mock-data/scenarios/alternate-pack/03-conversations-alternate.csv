@@ -1,0 +1,12 @@
+conversation_id,message_id,customer_external_id,channel,sender_type,sender_name,message_text,sent_at
+ALT-CON-101,ALT-MSG-101A,ALT-CRISIS-101,WhatsApp,customer,Nadia Escalation,"This is our third complaint. The replacement equipment arrived late and still does not work.",2026-07-12T09:00:00Z
+ALT-CON-101,ALT-MSG-101B,ALT-CRISIS-101,WhatsApp,staff,Aisha Rahman,"I will confirm the escalation outcome by Tuesday.",2026-07-12T10:00:00Z
+ALT-CON-101,ALT-MSG-101C,ALT-CRISIS-101,WhatsApp,customer,Nadia Escalation,"Tuesday passed with no update. We are comparing a competitor and may cancel at renewal.",2026-07-17T09:30:00Z
+ALT-CON-102,ALT-MSG-102A,ALT-PRICE-102,Email,customer,Omar Budget,"Usage has fallen and the current package price is difficult to justify for our budget.",2026-07-13T08:15:00Z
+ALT-CON-103,ALT-MSG-103A,ALT-PRIVATE-103,Email,customer,Priya Restricted,"Please resolve the billing complaint, but do not send any marketing messages.",2026-07-13T11:45:00Z
+ALT-CON-104,ALT-MSG-104A,ALT-NOPHONE-104,Email,customer,Quentin No Phone,"Please send service information by email because this account has no working mobile number.",2026-07-14T07:40:00Z
+ALT-CON-105,ALT-MSG-105A,ALT-DORMANT-105,Email,customer,Rosa Dormant,"Our clinics paused the rollout and there is no confirmed restart date.",2026-06-20T13:10:00Z
+ALT-CON-106,ALT-MSG-106A,ALT-RECOVER-106,WhatsApp,customer,Samuel Recovery,"The issue is resolved, the support team followed up, and our next order has been placed.",2026-07-18T08:00:00Z
+ALT-CON-107,ALT-MSG-107A,ALT-GROW-107,Email,customer,Talia Expansion,"The rollout is successful. Please show us the approved analytics and portal expansion options.",2026-07-16T06:50:00Z
+ALT-CON-108,ALT-MSG-108A,ALT-QUIET-108,Email,customer,Umar Statement,"Please send the current account statement for our records.",2026-07-15T10:10:00Z
+ALT-CON-109,ALT-MSG-109A,ALT-STABLE-109,WhatsApp,customer,Vivian Stable,"Everything is operating as expected and no follow-up is needed today.",2026-07-18T12:00:00Z

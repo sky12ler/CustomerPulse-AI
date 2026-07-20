@@ -5,10 +5,14 @@ Verification date: 19 July 2026. “Verified” below means covered by an observ
 | P0 criterion | Implementation evidence | Status |
 | --- | --- | --- |
 | Imports mutate operational data | Confirmed customer/transaction/conversation/product/result imports merge records, retain provenance and recalculate affected entities | Local browser + unit verified |
+| Project isolation | User-created project names are dynamic; uploads and all downstream operational state restore independently when projects switch | Unit + browser verified |
+| Imported content library | Imported entities/documents are listed per project; raw data/extracted text can be exported and original files downloaded | Browser verified locally |
 | AVO creates validated signals | Evidence IDs must resolve to authorised messages; confidence/uncertainty stored; invalid/low evidence is rejected or review-required | Unit + browser verified; MiMo endpoint connected |
 | Dynamic churn/ERAR | Authoritative tier/churn engine runs after imports, AVO and outcomes; ERAR-v1 is shared across pages | Unit + browser verified |
 | Dynamic alerts | Operational alerts create/update/resolve/reopen idempotently and render consistently in Alert Centre/Customer 360 | Unit + browser verified |
 | Customer-specific recommendations | New IDs bind customer, analysis and evidence; no shared REC-001 mapping for new analyses | Browser verified |
+| Four AVO choices | Structured output requires exactly three evidence-linked operational plans plus one separate message draft | Unit + browser verified |
+| Action Plan tracking | Admin selection requires owner/deadline; queue shows reminders; manual completion needs notes; expired open work becomes Not Completed | Browser verified |
 | Changes Requested loop | Reviewer comment → Draft Revision → new version → resubmission → different-user approval | Browser + unit verified |
 | Separate execution lifecycle | Start, execution, customer response and outcome are distinct transitions with role/status guards | Browser + unit verified |
 | Outcome recalculation | Stored outcome invokes real recalculation and updates score/alert/metrics/analytics using actual before/after | Browser + unit verified |
@@ -30,11 +34,11 @@ Verification date: 19 July 2026. “Verified” below means covered by an observ
 
 - ESLint: passed.
 - TypeScript: passed.
-- Vitest: 16 files, 127/127 passed.
+- Vitest: 18 files, 132/132 passed.
 - Production build: passed.
-- Playwright: 45/45 passed against the optimized local production server.
+- Playwright: 47/47 passed against the optimized local production server.
 - MiMo: production OpenAI-compatible requests succeeded with `mimo-v2.5-pro`; browser Scenario B also completed the AVO route during regression.
-- npm audit: 0 vulnerabilities at low threshold. Secret scan passed with `.env.local` ignored and untracked. The public Vercel regression passed 45/45, including the no-login Imported Workspace AVO pipeline.
+- npm audit: 0 vulnerabilities at high threshold. Secret scan passed with `.env.local` ignored and untracked. The earlier public Vercel release passed 45/45; the current project/action-plan working tree still requires deployment and a fresh production regression.
 
 ## Manual production prerequisites
 

@@ -38,7 +38,9 @@ Open the workspace selector.
 
 Say: “The Synthetic Demo Workspace resets safely. Imported Workspace needs no login: uploads create an isolated operational dataset in this browser, and Customers, alerts, recommendations, campaigns, analytics and audit all read those current records.”
 
-Show the scenario fixture names under Data Imports or briefly show an imported case if preloaded.
+Create `Original Mixed-Risk Project`, upload the three connected scenario CSVs and show Alicia in Customers. Create `Alternate Healthcare Project`, upload the alternate pack, show Nadia, then switch back and show that Alicia returns without either dataset being mixed. Open Project Data Library to show imported conversations, transactions and downloadable documents.
+
+Open an analysed customer's AVO result. Show the three operational plans and the separate message draft. As Administrator, choose one plan, assign an owner and due date, then open Action Plans to show its reminder, evidence and completion criteria. Explain that completion is manual and overdue open plans become `Not Completed`.
 
 Close: “CustomerPulse is useful beyond a scripted demo: evidence changes operational state; consent and approval block unsafe actions; outcomes feed back into risk and analytics. Demo Publisher does not claim external posting, and live-provider fallback is always visible.”
 
@@ -49,4 +51,4 @@ Close: “CustomerPulse is useful beyond a scripted demo: evidence changes opera
 - Never say Buffer posted externally when Demo Publisher is selected.
 - Never say MiMo was live unless the AVO result names the live provider without a fallback reason.
 - Never show `.env.local`, Supabase service-role values or API keys.
-- Imported Workspace is browser-local; do not claim cross-device or multi-user persistence.
+- In no-login mode, Imported Workspace is browser-local. Claim cross-device persistence only after an authenticated Supabase flow has been tested.
